@@ -46,61 +46,104 @@ class DDElinkHandler(object):
     if not ln.zPushLensPermission():
         raise RuntimeError("Extensions not allowed to push lenses. Please enable in Zemax.")
     ln.zPushLens(1)
-
-
-class AnalyzeTransmission(object):
-
-  def __init__(self, hDDE):
-    self.DDElink=hDDE.link;
-
     
-  def test(self):
-        
-    ln = self.DDElink;
-    
-    # pupil sampling
-    px = np.linspace(-1,1,201); py=px;
-    px,py=np.meshgrid(px,py);   
-    ind = px**2 + py**2 <= 1;
-    px=px[ind]; py=py[ind];
-    nRays = px.size;
+  def trace_rays(self,x,y, px,py, waveNum, mode=0, surf=-1):
+    """ 
+    array trace of rays
+      x,y   ... list of reduced field coordinates for each ray (length nRays)
+      px,py ... list of reduced pupil coordinates for each ray (length nRays)
+      waveNum.. wavelength number
+      mode  ... (opt) 0= real (Default), 1 = paraxial
+      surf  ... surface to trace the ray to. Usually, the ray data is only needed at
+                the image surface (``surf = -1``, default)
+
+    Returns
+      results... numpy array with ... columns containing
+       results[0:3]: x,y,z coordinates of ray on requested surface
+       results[3:6]: l,m,n direction cosines after requested surface
+       results[7]:   error value
+                      0 = ray traced successfully;
+                      +ve number = the ray missed the surface;
+                      -ve number = the ray total internal reflected (TIR) at surface
+                                   given by the absolute value of the ``error``
+    """
+    nRays = x.size;
+    if np.isscalar(waveNum): waveNum=np.zeros(nRays,np.int)+waveNum;
+    assert(all(args.size == nRays for args in [x,y,px,py,waveNum]))
     print("number of rays: %d"%nRays);
-        
-    x = np.zeros(nRays);
-    y = np.zeros(nRays)
-        
         
     # fill in ray data array (following Zemax notation!)
     t = time.time();    
-    rays = at.getRayDataArray(nRays, tType=0, mode=0, endSurf=-1)
+    rays = at.getRayDataArray(nRays, tType=0, mode=mode, endSurf=surf)
     for k in xrange(nRays):
       rays[k+1].x = x[k]      
       rays[k+1].y = y[k]
       rays[k+1].z = px[k]
       rays[k+1].l = py[k]
-      rays[k+1].intensity = 1.0
-      rays[k+1].wave = 1;
+      rays[k+1].wave = waveNum[k];
 
     print("set pupil values: %ds"%(time.time()-t))
 
     # Trace the rays
-    ret = at.zArrayTrace(rays, timeout=5000)
+    ret = at.zArrayTrace(rays, timeout=100000)
     print("zArrayTrace: %ds"%(time.time()-t))
 #
     # collect results
-    results = np.asarray( [(r.x,r.y,r.l,r.m,r.intensity) for r in rays[1:]] );
-
-    
+    results = np.asarray( [(r.x,r.y,r.z,r.l,r.m,r.n,r.error) for r in rays[1:]] );
     print("retrive data: %ds"%(time.time()-t))    
-
-    plt.figure();
-    plt.plot(results[:,0], results[:,1],'.')    
-    
     return results;
 
+def cartesian_sampling(nx,ny,rmax=1.):
+  """
+  cartesian sampling in reduced coordinates (between -1 and 1)
+   nx,ny ... number of points along x and y
+   rmax  ... (opt) radius of circular aperture, default 1
+  
+  RETURNS
+   x,y   ... 1d-vectors of x and y coordinates for each point
+  """
+  x = np.linspace(-1,1,nx);
+  y = np.linspace(-1,1,ny);
+  x,y=np.meshgrid(x,y);   
+  ind = x**2 + y**2 <= rmax;
+  return x[ind],y[ind]
 
+def fibonacci_sampling(N,rmax=1.):
+  """
+  Fibonacci sampling in reduced coordinates (normalized to 1)
+   N     ... total number of points (must be >32)
+   rmax  ... (opt) radius of circular aperture, default 1
+  
+  RETURNS
+   x,y   ... 1d-vectors of x and y coordinates for each point
+  """
+  k = np.arange(N)+0.5;
+  theta = 4*np.pi*k/(1+sqrt(5));
+  r = rmax*np.sqrt(k/N)
+  x = r * np.sin(theta);
+  y = r * np.cos(theta);
+  return x,y
+  
 
+class AnalyzeTransmission(object):
 
+  def __init__(self, hDDE):
+    self.hDDE=hDDE;
+
+  def plot_transmission(self,results):
+    from scipy.spatial import Delaunay
+    tri = Delaunay(results[:,[2,3]]);
+
+  def test(self):  
+    # pupil sampling
+    #px,py=cartesian_sampling(21,21);   
+    px,py=fibonacci_sampling(500)    
+    x=np.zeros(px.size); y=x;
+    results = self.hDDE.trace_rays(x,y,px,py,1);
+    
+    plt.figure();
+    plt.plot(results[:,0],results[:,1],'.')
+    return results
 
 
 if __name__ == '__main__':
@@ -117,4 +160,4 @@ if __name__ == '__main__':
     hDDE.load(filename);
     
     AT = AnalyzeTransmission(hDDE);
-    rd = AT.test();  
+    resultsre = AT.test();  
