@@ -124,26 +124,61 @@ def fibonacci_sampling(N,rmax=1.):
   y = r * np.cos(theta);
   return x,y
   
+def fibonacci_sampling_with_circular_boundary(N,Nboundary=32,rmax=1.):
+  assert(N>Nboundary);  
+  x,y = fibonacci_sampling(N-Nboundary,rmax=0.97*rmax);
+  theta = 2*np.pi*np.arange(Nboundary)/Nboundary;
+  xp = rmax * np.sin(theta);
+  yp = rmax * np.cos(theta);
+  return np.hstack([x, xp]), np.hstack([y, yp]);
+  
 
 class AnalyzeTransmission(object):
 
   def __init__(self, hDDE):
     self.hDDE=hDDE;
 
-  def plot_transmission(self,results):
-    from scipy.spatial import Delaunay
-    tri = Delaunay(results[:,[2,3]]);
-
   def test(self):  
+    from scipy.spatial import Delaunay
+
     # pupil sampling
     #px,py=cartesian_sampling(21,21);   
-    px,py=fibonacci_sampling(500)    
-    x=np.zeros(px.size); y=x;
+    px,py=fibonacci_sampling_with_circular_boundary(500,2*sqrt(500))  
+    x=np.zeros(px.size); y=x+1;
     results = self.hDDE.trace_rays(x,y,px,py,1);
+
+    # triangulation
+    points = np.vstack([px,py]).T;
+    tri = Delaunay(points);
+    x,y = points[tri.simplices].T;  # [3,nTriangles]
+    # area of triangle (see http://geomalgorithms.com/a01-_area.html#2D%20Polygons)    
+    pupil_intensity = 0.5 * ( (x[1]-x[0])*(y[2]-y[0]) - (x[2]-x[0])*(y[1]-y[0]) );
+    assert(all(pupil_intensity>0));  # all triangles should be ccw oriented
     
     plt.figure();
+    plt.triplot(tri.points[:,0], tri.points[:,1], tri.simplices.copy());
+    plt.plot(px,py,'.')
+    
+    
+    # triangulation in image space
+    plt.figure();
+    plt.triplot(results[:,0],results[:,1], tri.simplices.copy());
     plt.plot(results[:,0],results[:,1],'.')
+    x = results[tri.simplices,0].T; # [3,nTriangles]
+    y = results[tri.simplices,1].T;
+    # area of triangles in image plane
+    image_intensity = 0.5 * ( (x[1]-x[0])*(y[2]-y[0]) - (x[2]-x[0])*(y[1]-y[0]) );
+
+    plt.figure();
+    plt.plot(pupil_intensity)
+    plt.plot(image_intensity) 
+    plt.plot(abs(image_intensity)/pupil_intensity)
+
+    if any(image_intensity<0) and any(image_intensity>0):
+      logging.warning('scambling of rays, triangulartion may not be working')
+
     return results
+
 
 
 if __name__ == '__main__':
@@ -155,8 +190,11 @@ if __name__ == '__main__':
   
     ln = hDDE.link;
     # load example file
-    filename = os.path.join(ln.zGetPath()[1], 'Sequential', 'Objectives', 
-                            'Cooke 40 degree field.zmx')
+    #filename = os.path.join(ln.zGetPath()[1], 'Sequential', 'Objectives', 
+    #                        'Cooke 40 degree field.zmx')
+    filename = 'X:/projekte/1507_image_slicer/zemax/10_complete_system';
+    filename+= '/12_catalog_optics_1mm_pupil_point_source_with_slicer_tolerancing.ZMX';
+    
     hDDE.load(filename);
     
     AT = AnalyzeTransmission(hDDE);
