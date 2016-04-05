@@ -201,6 +201,7 @@ class AdaptiveMesh(object):
       skip_triangle... (opt) function mask=skip_triangle(triangles) that accepts a list of 
                      triangle vertices of shape (nTriangles, 3, 2) and returns 
                      a flag for each triangle indicating that it should not be drawn
+    returns figure handle;
     """ 
     simplices = self.tri.simplices.copy();
     if skip_triangle is not None:
@@ -219,8 +220,73 @@ class AdaptiveMesh(object):
     ax2.triplot(self.image[:,0], self.image[:,1], simplices,'b-');
     ax2.plot(self.initial_image[:,0],self.initial_image[:,1],'r.')
 
-  def refine_broken_triangles(self,is_broken):
-    pass
+    return fig;
+
+  def refine_broken_triangles(self,is_broken,nDivide=1000,bPlot=False):
+    """
+    subdivide triangles which contain discontinuities in the image mesh
+      is_broken ... function mask=is_broken(triangles) that accepts a list of 
+                     triangle vertices of shape (nTriangles, 3, 2) and returns 
+                     a flag for each triangle indicating if it should be subdivided
+      nDivide   ... (opt) number of subdivisions of each side of broken triangle
+      bPlot     ... (opt) plot sampling and selected points for debugging 
+    """
+    
+    ind = is_broken(self.image[self.tri.simplices]);
+    nTriangles = np.sum(ind)
+    if nTriangles==0: return; # noting to do
+    
+    # for each broken triangle, get vertex points in domain
+    triangles = self.domain[self.tri.simplices[ind]]; # shape (nTriangles,3,2)
+    
+    # - identify the two edges that are cut (correspond to longest edges in image space) 
+    #sides = np.diff(np.concatenate((triangles,triangles[:,[0],:]),axis=1));
+    #print np.argmin(np.sum(sides**2,axis=2),axis=1);
+
+    # create dense sampling along edges of broken triangles
+    # follow regular sampling on A->B->C->A in domain
+    x = np.linspace(0,1,nDivide,endpoint=False);
+    A,B,C = np.rollaxis(triangles,1);  # vertex points of shape (nTriangles,2)
+    AB = np.outer(1-x,A)+np.outer(x,B); # subdivision of shape (Ndivide,nTriangles*2)
+    BC = np.outer(1-x,B)+np.outer(x,C);
+    CA = np.outer(1-x,C)+np.outer(x,A);
+    domain_points = np.concatenate((AB,BC,CA,A.reshape(1,2*nTriangles)),axis=0);
+    nSamplePoints = 3*nDivide+1;        # shape (nSamplePoints,nTriangles*2) 
+    
+    # calculate position of intermeiate points in image space
+    image_points = self.mapping(domain_points.reshape(-1,2));
+    sides = np.diff(image_points.reshape(nSamplePoints,nTriangles,2),axis=0);
+    sides = np.sum(sides**2,axis=-1);  # shape (nSamplePoints-1,nTriangle)
+    
+    # there should be exactly two very long segments per triangle (crossing the discontinuity)
+    largest_segments = np.argpartition(sides,-2,axis=0)[-2:]; 
+                      # indices of two largest segments, shape (2,nTriangle)
+    # we add the two end points of each of the largest segments to the mesh
+    # (for each broken triangle we thus add 4 points)
+    ind_first_point = largest_segments.T.flatten(); # index of first end point of segments
+    ind_second_point= ind_first_point+1;            # index of second end point of segment
+    ind_end_points = np.vstack((ind_first_point,ind_second_point)).T.flatten();
+      # shape 4*nTriangles, order 4x(first end point, second end point), next triangle
+    ind_triangle = np.arange(nTriangles).repeat(4);
+      # corresponding triangle index, shape 4*nTriangles
+    new_domain_points = domain_points.reshape((nSamplePoints,nTriangles,2))[ind_end_points,ind_triangle];
+    new_image_points = image_points.reshape((nSamplePoints,nTriangles,2))[ind_end_points,ind_triangle];
+ 
+    if bPlot:   
+      fig = self.plot_triangulation(skip_triangle=is_broken);
+      ax1,ax2 = fig.axes;
+      ax1.plot(domain_points[:,0::2].flat,domain_points[:,1::2].flat,'k.',label='test points');
+      ax1.plot(new_domain_points[...,0].flat,new_domain_points[...,1].flat,'r.',label='selected points');
+      ax1.legend(loc=0);      
+      ax2.plot(image_points[:,0],image_points[:,1],'k.')
+      ax2.plot(new_image_points[...,0].flat,new_image_points[...,1].flat,'r.',label='selected points');
+
+    # update mesh
+    logging.info("refining_broken_triangles(): adding %d points"%(nSamplePoints));
+    self.tri.add_points(new_domain_points)
+    self.image = np.vstack((self.image,new_image_points));
+    self.domain= np.vstack((self.domain,new_domain_points));      
+    
   
   def refine_large_triangles(self,is_large):
     """
@@ -265,7 +331,7 @@ class AnalyzeTransmission(object):
     image_intensity = np.zeros(np.prod(image_shape)); # 1d array
 
     # field sampling
-    xx,yy=cartesian_sampling(3,3,rmax=1)  
+    xx,yy=cartesian_sampling(3,3,rmax=.1)  
     for i in xrange(len(xx)):
       x=xx[i]; y=yy[i];
       print("Field point: x=%5.3f, y=%5.3f"%(x,y))
@@ -280,11 +346,16 @@ class AnalyzeTransmission(object):
       Mesh=AdaptiveMesh(initial_sampling, raytrace);
 
       # iteratively perform refinement
+      #lthresh = 0.5*image_size[1];
+      #is_large= lambda(triangles): get_broken_triangles(triangles,lthresh);    
+      #for it in range(3): 
+      #  Mesh.refine_large_triangles(is_large);
+      #  if i==0: Mesh.plot_triangulation(skip_triangle=is_large);
       lthresh = 0.5*image_size[1];
-      is_large= lambda(triangles): get_broken_triangles(triangles,lthresh);    
-      for it in range(3): 
-        Mesh.refine_large_triangles(is_large);
-        if i==0: Mesh.plot_triangulation(skip_triangle=is_large);
+      is_broken = lambda(triangles): get_broken_triangles(triangles,lthresh);  
+      Mesh.refine_broken_triangles(is_broken,bPlot=True);
+      if i==0: Mesh.plot_triangulation(skip_triangle=is_broken);      
+      
       pupil_points, image_points, tri = Mesh.get_mesh();
       
         # analysis of beam intensity in each triangle (conservation of energy!) 
