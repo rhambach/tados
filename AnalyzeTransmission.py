@@ -10,7 +10,9 @@ import pyzdde.arraytrace as at  # Module for array ray tracing
 import pyzdde.zdde as pyz
 import logging
 import numpy as np
+import time
 import matplotlib.pylab as plt
+from matplotlib.path import Path
 
 class DDElinkHandler(object):
   """
@@ -75,10 +77,10 @@ class DDElinkHandler(object):
     if np.isscalar(py): py = np.zeros(nRays)+py;    
     if np.isscalar(waveNum): waveNum=np.zeros(nRays,np.int)+waveNum;
     assert(all(args.size == nRays for args in [x,y,px,py,waveNum]))
-    print("number of rays: %d"%nRays);
+    #print("number of rays: %d"%nRays);
+    #t = time.time();    
         
     # fill in ray data array (following Zemax notation!)
-    t = time.time();    
     rays = at.getRayDataArray(nRays, tType=0, mode=mode, endSurf=surf)
     for k in xrange(nRays):
       rays[k+1].x = x[k]      
@@ -87,15 +89,15 @@ class DDElinkHandler(object):
       rays[k+1].l = py[k]
       rays[k+1].wave = waveNum[k];
 
-    print("set pupil values: %ds"%(time.time()-t))
+    #print("set pupil values: %ds"%(time.time()-t))
 
     # Trace the rays
     ret = at.zArrayTrace(rays, timeout=100000)
-    print("zArrayTrace: %ds"%(time.time()-t))
+    #print("zArrayTrace: %ds"%(time.time()-t))
 #
     # collect results
     results = np.asarray( [(r.x,r.y,r.z,r.l,r.m,r.n,r.error) for r in rays[1:]] );
-    print("retrive data: %ds"%(time.time()-t))    
+    #print("retrive data: %ds"%(time.time()-t))    
     return results;
 
 def cartesian_sampling(nx,ny,rmax=1.):
@@ -123,7 +125,7 @@ def fibonacci_sampling(N,rmax=1.):
    x,y   ... 1d-vectors of x and y coordinates for each point
   """
   k = np.arange(N)+0.5;
-  theta = 4*np.pi*k/(1+sqrt(5));
+  theta = 4*np.pi*k/(1+np.sqrt(5));
   r = rmax*np.sqrt(k/N)
   x = r * np.sin(theta);
   y = r * np.cos(theta);
@@ -176,84 +178,105 @@ class AnalyzeTransmission(object):
   def test(self):  
     from scipy.spatial import Delaunay
 
-    # pupil sampling
-    #px,py=cartesian_sampling(21,21);   
-    image_size = np.asarray((0.14,0.14));
-    px,py=fibonacci_sampling_with_circular_boundary(500,2*sqrt(500))  
-    x=1; y=0;
-    # triangulation
-    pupil_points = np.vstack((px,py)).T; # size (nPoints,2)
-    tri = Delaunay(pupil_points,incremental=True);
-
-    # raytrace to image plane and refinement
-    results = self.hDDE.trace_rays(x,y,px,py,1);
-    image_points = results[:,[0,1]];
-    lthresh = 0.1*np.sqrt(np.sum(image_size**2));
-    for it in range(3): 
-      # refine triangulation, if triangles have very large sides (cut triangles)
-      ind = get_broken_triangles(image_points[tri.simplices],lthresh=lthresh);
-      if np.sum(ind)==0: break;
-      # add center of gravity for critical triangles
-      new_pupil_points = np.sum(pupil_points[tri.simplices[ind]],axis=1)/3;
-      tri.add_points(new_pupil_points);
-      logging.info("refining pupil sampling (iteration %d): adding %d points"%(it,new_pupil_points.shape[0]))
-      # raytrace for new points and update of data
-      new_results = self.hDDE.trace_rays(x,y,new_pupil_points[:,0],new_pupil_points[:,1],1)
-      results = np.vstack((results,new_results));
-      pupil_points = np.vstack((pupil_points,new_pupil_points));
-      image_points = results[:,[0,1]]
-    tri.close(); # finish refinement (free resources)
-
-    # DEBUG plotting of footprint + triangulation in pupil and image
-    plt.figure();
-    plt.title("Pupil Sampling + Triangulation");
-    plt.triplot(pupil_points[:,0], pupil_points[:,1], tri.simplices.copy());
-    plt.plot(px,py,'.')
-    
-    plt.figure();
-    plt.title("Spot in Image space + Triangulation from Pupil")
-    broken = get_broken_triangles(image_points[tri.simplices],lthresh=lthresh)
-    plt.triplot(results[:,0],results[:,1], tri.simplices[~broken].copy());
-    plt.plot(results[:,0],results[:,1],'.')
-    
-    # analysis of beam intensity in each triangle (conservation of energy!) 
-    pupil_area = get_area(pupil_points[tri.simplices]); 
-    assert(all(pupil_area>0));  # all triangles should be ccw oriented in pupil
-    err_circ = 1-np.sum(pupil_area)/np.pi;    
-    err_broken = np.sum(pupil_area[broken])/np.sum(pupil_area);
-    logging.info('error of triangulation: \n' +
-     '  %5.3f%% due to approx. of circular pupil boundary \n'%(err_circ*100) +
-     '  %5.3f%% due to broken triangles' %(err_broken*100));
-    image_area = get_area(image_points[tri.simplices]);
-    if any(image_area<0) and any(image_area>0):
-      logging.warning('scambling of rays, triangulation may not be working')
-
-    plt.figure();
-    plt.title("Intensity in each triangle of the Pupil Triangulation");
-    plt.plot(pupil_area,'b',label="$A_{pupil}$")
-    plt.plot(image_area,'g',label="$A_{image}$") 
-    #ratio = abs(image_area/pupil_area);
-    #plt.plot(ratio,'k',label="$A_{image}/A_{pupil}$")
-    #ratio[~get_broken_triangles(image_points[tri.simplices])]=np.NaN;    
-    #plt.plot(ratio,'r.',label="broken triangles")
-    plt.legend(loc='best');
- 
- 
-    # footprint in image plane
-    img_shape=(1001,1001);
-    img_pixels = np.transpose(cartesian_sampling(*img_shape,rmax=2)); # shape: (nPixels,2)
+    # set up ray-trace parameters and image detector
+    image_surface = 22;
+    wavenum  = 3;
+    image_size = np.asarray((0.2,0.05));
+    image_size = np.asarray((0.2,0.05));
+    image_shape = np.asarray((101,201));
+    img_pixels = np.transpose(cartesian_sampling(*image_shape,rmax=2)); # shape: (nPixels,2)
     img_pixels*= image_size/2;
-    tri.points = image_points;
-    ind = tri.find_simplex(img_pixels);
-    density = abs(pupil_area / image_area);
-    density = np.hstack((density, [0,]));
-    intensity = density[ind].reshape(img_shape);
+    image_intensity = np.zeros(np.prod(image_shape)); # 1d array
+
+    # field sampling
+    xx,yy=cartesian_sampling(3,3)  
+    for i in xrange(len(xx)):
+      x=xx[i]; y=yy[i];
+      print("Field point: x=%5.3f, y=%5.3f"%(x,y))
+      
+      # pupil sampling
+      #px,py=cartesian_sampling(21,21);   
+      px,py=fibonacci_sampling_with_circular_boundary(100,2*np.sqrt(500))  
+      # triangulation
+      pupil_points = np.vstack((px,py)).T; # size (nPoints,2)
+      tri = Delaunay(pupil_points,incremental=True);
+  
+      # raytrace to image plane and refinement
+      results = self.hDDE.trace_rays(x,y,px,py,wavenum,surf=image_surface);
+      image_points = results[:,[0,1]];
+      lthresh = 0.5*image_size[1];
+    
+      for it in range(5): 
+        # refine triangulation, if triangles have very large sides (cut triangles)
+        ind = get_broken_triangles(image_points[tri.simplices],lthresh=lthresh);
+        if np.sum(ind)==0: break;
+        # add center of gravity for critical triangles
+        new_pupil_points = np.sum(pupil_points[tri.simplices[ind]],axis=1)/3;
+        tri.add_points(new_pupil_points);
+        logging.info("refining pupil sampling (iteration %d): adding %d points"%(it,new_pupil_points.shape[0]))
+        # raytrace for new points and update of data
+        new_results = self.hDDE.trace_rays(x,y,new_pupil_points[:,0],new_pupil_points[:,1],wavenum,surf=image_surface)
+        results = np.vstack((results,new_results));
+        pupil_points = np.vstack((pupil_points,new_pupil_points));
+        image_points = results[:,[0,1]]
+      tri.close(); # finish refinement (free resources)
+  
+      
+      # analysis of beam intensity in each triangle (conservation of energy!) 
+      broken = get_broken_triangles(image_points[tri.simplices],lthresh=lthresh)  
+      pupil_area = get_area(pupil_points[tri.simplices]); 
+      assert(all(pupil_area>0));  # all triangles should be ccw oriented in pupil
+      err_circ = 1-np.sum(pupil_area)/np.pi;    
+      err_broken = np.sum(pupil_area[broken])/np.sum(pupil_area);
+      logging.info('error of triangulation: \n' +
+       '  %5.3f%% due to approx. of circular pupil boundary \n'%(err_circ*100) +
+       '  %5.3f%% due to broken triangles' %(err_broken*100));
+      image_area = get_area(image_points[tri.simplices]);
+      if any(image_area<0) and any(image_area>0):
+        logging.warning('scambling of rays, triangulation may not be working')
+      
+      # footprint in image plane
+      density = abs(pupil_area / image_area);
+      for s,vertices in enumerate(tri.simplices[~broken]):
+        path = Path( image_points[vertices] );
+        mask = path.contains_points(img_pixels);
+        image_intensity += density[s]*mask;
+      
+      if i==0:
+        # DEBUG plotting of footprint + triangulation in pupil and image
+        plt.figure();
+        plt.title("Pupil Sampling + Triangulation");
+        plt.triplot(pupil_points[:,0], pupil_points[:,1], tri.simplices.copy());
+        plt.plot(px,py,'.')
+        
+        plt.figure();
+        plt.title("Spot in Image space + Triangulation from Pupil")
+        plt.triplot(results[:,0],results[:,1], tri.simplices[~broken].copy());
+        plt.plot(results[:,0],results[:,1],'.')
+        
+        plt.figure();
+        plt.title("Intensity in each triangle of the Pupil Triangulation");
+        plt.plot(pupil_area,'b',label="$A_{pupil}$")
+        plt.plot(image_area,'g',label="$A_{image}$") 
+        #ratio = abs(image_area/pupil_area);
+        #plt.plot(ratio,'k',label="$A_{image}/A_{pupil}$")
+        #ratio[~get_broken_triangles(image_points[tri.simplices])]=np.NaN;    
+        #plt.plot(ratio,'r.',label="broken triangles")
+        plt.legend(loc='best');
+ 
+ 
     plt.figure();
-    plt.imshow(intensity,origin='lower');
+    img_pixels_2d = img_pixels.reshape(image_shape[1],image_shape[0],2);
+    image_intensity = image_intensity.reshape((image_shape[1],image_shape[0]))   
+    xaxis = img_pixels_2d[:,0,1];
+    yaxis = img_pixels_2d[0,:,0];
+    plt.imshow(image_intensity,origin='lower',extent=[xaxis[0],xaxis[-1],yaxis[0],yaxis[-1]]);
     plt.figure();
-    plt.plot(np.sum(intensity,axis=0));
-    plt.plot(np.sum(intensity,axis=1))
-    return results
+    plt.plot(xaxis,np.sum(image_intensity,axis=1),label="sum along y");
+    plt.plot(yaxis,np.sum(image_intensity,axis=0),label="sum along x");
+    plt.legend(loc=0)
+    
+    return 1
 
 
 
