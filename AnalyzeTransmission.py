@@ -152,6 +152,7 @@ def get_area(triangles):
   # See http://geomalgorithms.com/a01-_area.html#2D%20Polygons
   return 0.5 * ( (x[1]-x[0])*(y[2]-y[0]) - (x[2]-x[0])*(y[1]-y[0]) );
 
+
 def get_broken_triangles(triangles,lthresh=None):
   """
   try to identify triangles that are cut or vignetted
@@ -169,6 +170,83 @@ def get_broken_triangles(triangles,lthresh=None):
   return max_lensq > lthresh**2;
 
 
+
+class AdaptiveMesh(object):
+  
+  def __init__(self,initial_domain,mapping):
+    """
+      initial_domain ... 2d array of shape (nPixels,2)
+      mapping        ... function image=mapping(domain) that accepts a list of  
+                           domain points and returns corresponding image points
+    """
+    from scipy.spatial import Delaunay
+     
+    assert( initial_domain.ndim==2 and initial_domain.shape[1] == 2)
+    self.initial_domain = initial_domain;
+    self.mapping = mapping;
+    # triangulation of initial domain
+    self.tri = Delaunay(initial_domain,incremental=True);
+    # calculate distorted grid
+    self.initial_image = self.mapping(self.initial_domain);
+    assert( self.initial_image.ndim==2)
+    assert( self.initial_image.shape==(self.initial_domain.shape[0],2))
+    # current domain and image during refinement and for plotting
+    self.domain = self.initial_domain;    
+    self.image  = self.initial_image;   
+    
+  
+  def plot_triangulation(self,skip_triangle=None):
+    """
+    plot current triangulation of adaptive mesh in domain and image space
+      skip_triangle... (opt) function mask=skip_triangle(triangles) that accepts a list of 
+                     triangle vertices of shape (nTriangles, 3, 2) and returns 
+                     a flag for each triangle indicating that it should not be drawn
+    """ 
+    simplices = self.tri.simplices.copy();
+    if skip_triangle is not None:
+      skip = skip_triangle(self.image[simplices]);
+      skipped_simplices=simplices[skip];
+      simplices=simplices[~skip];
+          
+    fig,(ax1,ax2)= plt.subplots(2);
+    ax1.set_title("Sampling + Triangulation in Domain");
+    if skip_triangle is not None:
+      ax1.triplot(self.domain[:,0], self.domain[:,1], skipped_simplices,'k:');
+    ax1.triplot(self.domain[:,0], self.domain[:,1], simplices,'b-');    
+    ax1.plot(self.initial_domain[:,0],self.initial_domain[:,1],'r.')
+    
+    ax2.set_title("Sampling + Triangulation in Image")
+    ax2.triplot(self.image[:,0], self.image[:,1], simplices,'b-');
+    ax2.plot(self.initial_image[:,0],self.initial_image[:,1],'r.')
+
+  def refine_broken_triangles(self,is_broken):
+    pass
+  
+  def refine_large_triangles(self,is_large):
+    """
+    subdivide large triangles in the image mesh
+      is_large ... function mask=is_large(triangles) that accepts a list of 
+                     triangle vertices of shape (nTriangles, 3, 2) and returns 
+                     a flag for each triangle indicating if it should be subdivided
+    """
+    ind = is_large(self.image[self.tri.simplices]);
+    if np.sum(ind)==0: return; # nothing to do
+    
+    # add center of gravity for critical triangles
+    new_domain_points = np.sum(self.domain[self.tri.simplices[ind]],axis=1)/3;
+    self.tri.add_points(new_domain_points);
+    logging.info("refining_large_triangles(): adding %d points"%(new_domain_points.shape[0]))
+    
+    # calculate image points and update data
+    new_image_points = self.mapping(new_domain_points);
+    self.image = np.vstack((self.image,new_image_points));
+    self.domain= np.vstack((self.domain,new_domain_points));
+        
+  def get_mesh(self):
+    return self.domain,self.image,self.tri;
+
+
+
 class AnalyzeTransmission(object):
 
   def __init__(self, hDDE):
@@ -176,8 +254,6 @@ class AnalyzeTransmission(object):
 
 
   def test(self):  
-    from scipy.spatial import Delaunay
-
     # set up ray-trace parameters and image detector
     image_surface = 22;
     wavenum  = 3;
@@ -189,40 +265,29 @@ class AnalyzeTransmission(object):
     image_intensity = np.zeros(np.prod(image_shape)); # 1d array
 
     # field sampling
-    xx,yy=cartesian_sampling(3,3)  
+    xx,yy=cartesian_sampling(3,3,rmax=1)  
     for i in xrange(len(xx)):
       x=xx[i]; y=yy[i];
       print("Field point: x=%5.3f, y=%5.3f"%(x,y))
       
-      # pupil sampling
-      #px,py=cartesian_sampling(21,21);   
+      # init adaptive mesh for pupil sampling
       px,py=fibonacci_sampling_with_circular_boundary(100,2*np.sqrt(500))  
-      # triangulation
-      pupil_points = np.vstack((px,py)).T; # size (nPoints,2)
-      tri = Delaunay(pupil_points,incremental=True);
-  
-      # raytrace to image plane and refinement
-      results = self.hDDE.trace_rays(x,y,px,py,wavenum,surf=image_surface);
-      image_points = results[:,[0,1]];
+      initial_sampling = np.vstack((px,py)).T;         # size (nPoints,2)
+      def raytrace(pupil_points):        # local function for raytrace
+        px,py = pupil_points.T;
+        ret = self.hDDE.trace_rays(x,y,px,py,wavenum,surf=image_surface);
+        return ret[:,[0,1]];
+      Mesh=AdaptiveMesh(initial_sampling, raytrace);
+
+      # iteratively perform refinement
       lthresh = 0.5*image_size[1];
-    
-      for it in range(5): 
-        # refine triangulation, if triangles have very large sides (cut triangles)
-        ind = get_broken_triangles(image_points[tri.simplices],lthresh=lthresh);
-        if np.sum(ind)==0: break;
-        # add center of gravity for critical triangles
-        new_pupil_points = np.sum(pupil_points[tri.simplices[ind]],axis=1)/3;
-        tri.add_points(new_pupil_points);
-        logging.info("refining pupil sampling (iteration %d): adding %d points"%(it,new_pupil_points.shape[0]))
-        # raytrace for new points and update of data
-        new_results = self.hDDE.trace_rays(x,y,new_pupil_points[:,0],new_pupil_points[:,1],wavenum,surf=image_surface)
-        results = np.vstack((results,new_results));
-        pupil_points = np.vstack((pupil_points,new_pupil_points));
-        image_points = results[:,[0,1]]
-      tri.close(); # finish refinement (free resources)
-  
+      is_large= lambda(triangles): get_broken_triangles(triangles,lthresh);    
+      for it in range(3): 
+        Mesh.refine_large_triangles(is_large);
+        if i==0: Mesh.plot_triangulation(skip_triangle=is_large);
+      pupil_points, image_points, tri = Mesh.get_mesh();
       
-      # analysis of beam intensity in each triangle (conservation of energy!) 
+        # analysis of beam intensity in each triangle (conservation of energy!) 
       broken = get_broken_triangles(image_points[tri.simplices],lthresh=lthresh)  
       pupil_area = get_area(pupil_points[tri.simplices]); 
       assert(all(pupil_area>0));  # all triangles should be ccw oriented in pupil
@@ -243,38 +308,26 @@ class AnalyzeTransmission(object):
         image_intensity += density[s]*mask;
       
       if i==0:
-        # DEBUG plotting of footprint + triangulation in pupil and image
-        plt.figure();
-        plt.title("Pupil Sampling + Triangulation");
-        plt.triplot(pupil_points[:,0], pupil_points[:,1], tri.simplices.copy());
-        plt.plot(px,py,'.')
-        
-        plt.figure();
-        plt.title("Spot in Image space + Triangulation from Pupil")
-        plt.triplot(results[:,0],results[:,1], tri.simplices[~broken].copy());
-        plt.plot(results[:,0],results[:,1],'.')
-        
         plt.figure();
         plt.title("Intensity in each triangle of the Pupil Triangulation");
         plt.plot(pupil_area,'b',label="$A_{pupil}$")
         plt.plot(image_area,'g',label="$A_{image}$") 
-        #ratio = abs(image_area/pupil_area);
-        #plt.plot(ratio,'k',label="$A_{image}/A_{pupil}$")
-        #ratio[~get_broken_triangles(image_points[tri.simplices])]=np.NaN;    
-        #plt.plot(ratio,'r.',label="broken triangles")
         plt.legend(loc='best');
  
- 
-    plt.figure();
+    # plotting of footprint in image plane
     img_pixels_2d = img_pixels.reshape(image_shape[1],image_shape[0],2);
     image_intensity = image_intensity.reshape((image_shape[1],image_shape[0]))   
     xaxis = img_pixels_2d[:,0,1];
     yaxis = img_pixels_2d[0,:,0];
-    plt.imshow(image_intensity,origin='lower',extent=[xaxis[0],xaxis[-1],yaxis[0],yaxis[-1]]);
-    plt.figure();
-    plt.plot(xaxis,np.sum(image_intensity,axis=1),label="sum along y");
-    plt.plot(yaxis,np.sum(image_intensity,axis=0),label="sum along x");
-    plt.legend(loc=0)
+    
+    fig,(ax1,ax2)= plt.subplots(2);
+    ax1.set_title("footprint in image plane (surface: %d)"%image_surface);
+    ax1.imshow(image_intensity,origin='lower',aspect='auto',
+               extent=[xaxis[0],xaxis[-1],yaxis[0],yaxis[-1]]);
+    ax2.set_title("integrated intensity in image plane");    
+    ax2.plot(xaxis,np.sum(image_intensity,axis=1),label="along y");
+    ax2.plot(yaxis,np.sum(image_intensity,axis=0),label="along x");
+    ax2.legend(loc=0)
     
     return 1
 
