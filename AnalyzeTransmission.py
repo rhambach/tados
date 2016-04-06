@@ -241,18 +241,14 @@ class AdaptiveMesh(object):
           domain and image (here: ray-trace) by recognizing identical sampling points
           and selecting the two broken sides of the triangle in advance
     """
-    
-    ind = is_broken(self.image[self.simplices]);
-    nTriangles = np.sum(ind)
-    if nTriangles==0: return; # noting to do
+    broken = is_broken(self.image[self.simplices]);
+    nTriangles = np.sum(broken)
+    if nTriangles==0: return;                 # noting to do!
+    nPointsOrigMesh = self.image.shape[0];  
     
     # for each broken triangle, get vertex points in domain
-    triangles = self.domain[self.simplices[ind]]; # shape (nTriangles,3,2)
+    triangles = self.domain[self.simplices[broken]]; # shape (nTriangles,3,2)
     
-    # - identify the two edges that are cut (correspond to longest edges in image space) 
-    #sides = np.diff(np.concatenate((triangles,triangles[:,[0],:]),axis=1));
-    #print np.argmin(np.sum(sides**2,axis=2),axis=1);
-
     # create dense sampling along edges of broken triangles
     # follow regular sampling on A->B->C->A in domain
     x = np.linspace(0,1,nDivide,endpoint=False);
@@ -276,12 +272,18 @@ class AdaptiveMesh(object):
     ind_first_point = largest_segments.T.flatten(); # index of first end point of segments
     ind_second_point= ind_first_point+1;            # index of second end point of segment
     ind_end_points = np.vstack((ind_first_point,ind_second_point)).T.flatten();
-      # shape 4*nTriangles, order 4x(first end point, second end point), next triangle
+      # shape nTriangles*4, order 2x(first end point, second end point), next triangle
     ind_triangle = np.arange(nTriangles).repeat(4);
-      # corresponding triangle index, shape 4*nTriangles
+      # corresponding triangle index, shape nTriangles*4
     new_domain_points = domain_points.reshape((nSamplePoints,nTriangles,2))[ind_end_points,ind_triangle];
     new_image_points = image_points.reshape((nSamplePoints,nTriangles,2))[ind_end_points,ind_triangle];
- 
+      # shape (nTriangles*4,2), reshaped as (nTriangles,4,2)
+
+    # update points in mesh
+    logging.info("refining_broken_triangles(): adding %d points"%(nSamplePoints));
+    self.image = np.vstack((self.image,new_image_points));              # no longer unique points
+    self.domain= np.vstack((self.domain,new_domain_points));
+
     if bPlot:   
       fig = self.plot_triangulation(skip_triangle=is_broken);
       ax1,ax2 = fig.axes;
@@ -291,13 +293,80 @@ class AdaptiveMesh(object):
       ax2.plot(image_points[:,0],image_points[:,1],'k.')
       ax2.plot(new_image_points[...,0].flat,new_image_points[...,1].flat,'r.',label='selected points');
 
-    # update mesh
-    logging.info("refining_broken_triangles(): adding %d points"%(nSamplePoints));
-    self.__tri.add_points(new_domain_points)
-    self.image = np.vstack((self.image,new_image_points));
-    self.domain= np.vstack((self.domain,new_domain_points));      
+    # add new simplices:
+    # segmentation of each broken triangle is generated in a cyclic manner,
+    # starting with isolated point C and the two closest new sampling points
+    # in image space, p1 + p2), continues with p3,p4,A,B.
+    #    
+    #             C
+    #             /\
+    #            /  \              \\\ largest segments of triangle in image space
+    #        p1 *    *  p2          *  new sampling points
+    #     ....///....\\\.............. discontinuity
+    #      p3 *        * p4
+    #        /          \          new triangles:
+    #       /____________\           (C,p1,p2),             isolated point + closest two new points  
+    #      A              B          (p1,p2,p3),(p2,p3,p4)  new broken triangles, only between new sampling points
+    #                                (p3,p4,A), (p4,A,B):   rest
+    # 
+    # Note: one has to pay attention, that C,p1,p3,A are located on same side
+    #       of the triangle, otherwise the partition will fail!     
+
+    # identify the shortest edge of the triangle in image space (not cut)
+    simplices = self.simplices[broken];                    # shape (nTriangles,3)
+    triangles = self.image[simplices];                     # shape (nTriangles,3,2)
+    vertices = np.concatenate((triangles,triangles[:,[0],:]),axis=1); # shape (nTriangles,4,2)
+    edge_len = np.sum( np.diff(vertices,axis=1)**2, axis=2); # shape (nTriangles,3)
+    min_edge = np.argmin( edge_len,axis=1);                # shape (nTriangles)
+ 
+    # get indices of points ABC as shown above (C is isolated point)
+    ind_triangle = np.arange(nTriangles)
+    A = simplices[ind_triangle,min_edge];           # first point of shortest side
+    B = simplices[ind_triangle,(min_edge+1)%3];     # second point of shortest side
+    C = simplices[ind_triangle,(min_edge+2)%3];     # point opposit to shortest side
+    # order new sampling points by distance to C in image space
+    dist = np.sum( (new_image_points - self.image[C].repeat(4,axis=0))**2, axis=1); # shape (nTriangles*4)
+    sort_indices = np.argsort(dist.reshape(nTriangles,4),axis=1);  # shape (nTriangles,4), index in new_image_points array
+    # calculate indices of sorted points 
+    # Note: we offset indices by number of points in original triangulation
+    new_points_index = np.arange(nTriangles*4).reshape(nTriangles,4) + nPointsOrigMesh;  
+    ind_triangle = np.arange(nTriangles).repeat(4).reshape(nTriangles,4);    
+    p1,p2,p3,p4 = new_points_index[ind_triangle,sort_indices].T; # shape(nTriangles)
+ 
+    # construct the five triangles from points
+    t1=np.vstack((C,p1,p2));                        # shape (3,nTriangles)
+    t2=np.vstack((p1,p2,p3));
+    t3=np.vstack((p2,p3,p4));
+    t4=np.vstack((p3,p4,A));
+    t5=np.vstack((p4,A,B));
+    new_simplices = np.hstack((t1,t2,t3,t4,t5)).T;  
+       # shape (5*nTriangles,3), reshape as (5,nTriangles,3) to obtain subdivision of each triangle  
+
+    # DEBUG subdivision of triangles
+    if bPlot:
+      old = np.sum(np.abs(get_area(self.domain[simplices])));
+      new = np.sum(np.abs(get_area(self.domain[new_simplices])))
+      print old,new
+      #assert(abs((old-new)/old)<1e-10)
+      t=7;  # select index of triangle to look at
+      BCA=[B[t],C[t],A[t]]; subdiv=new_simplices[t::nTriangles,:];
+      pt=self.domain[BCA]; ax1.plot(pt[...,0],pt[...,1],'g')
+      pt=self.image[BCA];  ax2.plot(pt[...,0],pt[...,1],'g')
+      pt=self.domain[subdiv]; ax1.plot(pt[...,0],pt[...,1],'r')
+      pt=self.image[subdiv];  ax2.plot(pt[...,0],pt[...,1],'r')
+
+    # we remove degenerated triangles (p1..4 identical ot A,B or C) 
+    # and orient all triangles ccw in domain before adding them to the list of simplices
+    area = get_area(self.domain[new_simplices]);
+    new_simplices[area<0] = new_simplices[area<0,::-1]; # reverse cw triangles
+    new_simplices = new_simplices[np.abs(area)>0];             # remove degenerate triangles
+
+    # update simplices in mesh    
+    self.__tri = None; # delete initial Delaunay triangulation        
+    self.simplices=np.vstack((self.simplices[~broken], new_simplices)); # no longer Delaunay
+
     
-  
+    
   def refine_large_triangles(self,is_large):
     """
     subdivide large triangles in the image mesh
@@ -325,7 +394,7 @@ class AdaptiveMesh(object):
     self.image = np.vstack((self.image,new_image_points));
     self.domain= np.vstack((self.domain,new_domain_points));
     self.simplices = self.__tri.simplices;
-    self.__tri = None;        
+        
         
   def get_mesh(self):
     return self.domain,self.image,self.simplices;
@@ -341,16 +410,16 @@ class AnalyzeTransmission(object):
   def test(self):  
     # set up ray-trace parameters and image detector
     image_surface = 22;
-    wavenum  = 3;
+    wavenum  = 1;
     image_size = np.asarray((0.2,0.05));
     image_size = np.asarray((0.2,0.05));
-    image_shape = np.asarray((101,201));
+    image_shape = np.asarray((101,101));
     img_pixels = np.transpose(cartesian_sampling(*image_shape,rmax=2)); # shape: (nPixels,2)
     img_pixels*= image_size/2;
     image_intensity = np.zeros(np.prod(image_shape)); # 1d array
 
     # field sampling
-    xx,yy=cartesian_sampling(3,3,rmax=1)  
+    xx,yy=cartesian_sampling(3,3,rmax=.1)  
     for i in xrange(len(xx)):
       x=xx[i]; y=yy[i];
       print("Field point: x=%5.3f, y=%5.3f"%(x,y))
@@ -365,7 +434,10 @@ class AnalyzeTransmission(object):
       Mesh=AdaptiveMesh(initial_sampling, raytrace);
 
       # iteratively perform refinement
-      if True:      
+      pupil_points, image_points, simplices = Mesh.get_mesh();
+      before = np.sum(np.abs(get_area(pupil_points[simplices])));
+      
+      if False:      
         lthresh = 0.5*image_size[1];
         is_large= lambda(triangles): get_broken_triangles(triangles,lthresh);    
         for it in range(4): 
@@ -374,15 +446,19 @@ class AnalyzeTransmission(object):
       else:
         lthresh = 0.5*image_size[1];
         is_broken = lambda(triangles): get_broken_triangles(triangles,lthresh);  
-        Mesh.refine_broken_triangles(is_broken,bPlot=True);
-        if i==0: Mesh.plot_triangulation(skip_triangle=is_broken);      
+        Mesh.refine_broken_triangles(is_broken,nDivide=5,bPlot=True);
+        Mesh.plot_triangulation(skip_triangle=is_broken);      
       
       pupil_points, image_points, simplices = Mesh.get_mesh();
+      after = np.sum(np.abs(get_area(pupil_points[simplices])));      
+      
+      print before, after
+      #assert(abs((before-after)/before)<1e-10)
       
         # analysis of beam intensity in each triangle (conservation of energy!) 
       broken = get_broken_triangles(image_points[simplices],lthresh=lthresh)  
       pupil_area = get_area(pupil_points[simplices]); 
-      assert(all(pupil_area>0));  # all triangles should be ccw oriented in pupil
+      assert(all(pupil_area>0));  # triangles should be oriented ccw in pupil
       err_circ = 1-np.sum(pupil_area)/np.pi;    
       err_broken = np.sum(pupil_area[broken])/np.sum(pupil_area);
       logging.info('error of triangulation: \n' +
@@ -394,8 +470,8 @@ class AnalyzeTransmission(object):
       
       # footprint in image plane
       density = abs(pupil_area / image_area);
-      for s,vertices in enumerate(simplices[~broken]):
-        path = Path( image_points[vertices] );
+      for s in np.where(~broken)[0]:
+        path = Path( image_points[simplices[s]] );
         mask = path.contains_points(img_pixels);
         image_intensity += density[s]*mask;
       
@@ -414,7 +490,7 @@ class AnalyzeTransmission(object):
     
     fig,(ax1,ax2)= plt.subplots(2);
     ax1.set_title("footprint in image plane (surface: %d)"%image_surface);
-    ax1.imshow(image_intensity,origin='lower',aspect='auto',
+    ax1.imshow(image_intensity,origin='lower',aspect='auto',interpolation='hanning',
                extent=[xaxis[0],xaxis[-1],yaxis[0],yaxis[-1]]);
     ax2.set_title("integrated intensity in image plane");    
     ax2.plot(xaxis,np.sum(image_intensity,axis=1),label="along y");
