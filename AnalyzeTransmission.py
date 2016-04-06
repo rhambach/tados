@@ -185,7 +185,8 @@ class AdaptiveMesh(object):
     self.initial_domain = initial_domain;
     self.mapping = mapping;
     # triangulation of initial domain
-    self.tri = Delaunay(initial_domain,incremental=True);
+    self.__tri = Delaunay(initial_domain,incremental=True);
+    self.simplices = self.__tri.simplices;
     # calculate distorted grid
     self.initial_image = self.mapping(self.initial_domain);
     assert( self.initial_image.ndim==2)
@@ -203,7 +204,7 @@ class AdaptiveMesh(object):
                      a flag for each triangle indicating that it should not be drawn
     returns figure handle;
     """ 
-    simplices = self.tri.simplices.copy();
+    simplices = self.simplices.copy();
     if skip_triangle is not None:
       skip = skip_triangle(self.image[simplices]);
       skipped_simplices=simplices[skip];
@@ -222,7 +223,7 @@ class AdaptiveMesh(object):
 
     return fig;
 
-  def refine_broken_triangles(self,is_broken,nDivide=1000,bPlot=False):
+  def refine_broken_triangles(self,is_broken,nDivide=10,bPlot=False):
     """
     subdivide triangles which contain discontinuities in the image mesh
       is_broken ... function mask=is_broken(triangles) that accepts a list of 
@@ -230,14 +231,23 @@ class AdaptiveMesh(object):
                      a flag for each triangle indicating if it should be subdivided
       nDivide   ... (opt) number of subdivisions of each side of broken triangle
       bPlot     ... (opt) plot sampling and selected points for debugging 
+
+    Note: The resulting mesh will be no longer a Delaunay mesh (identical points 
+          might be present, circumference rule not guaranteed). Mesh functions, 
+          that need this property (like refine_large_triangles()) will not work
+          after calling this function.
+    
+    Todo: we might save 33% - 66% of the effort on calculating the mapping between
+          domain and image (here: ray-trace) by recognizing identical sampling points
+          and selecting the two broken sides of the triangle in advance
     """
     
-    ind = is_broken(self.image[self.tri.simplices]);
+    ind = is_broken(self.image[self.simplices]);
     nTriangles = np.sum(ind)
     if nTriangles==0: return; # noting to do
     
     # for each broken triangle, get vertex points in domain
-    triangles = self.domain[self.tri.simplices[ind]]; # shape (nTriangles,3,2)
+    triangles = self.domain[self.simplices[ind]]; # shape (nTriangles,3,2)
     
     # - identify the two edges that are cut (correspond to longest edges in image space) 
     #sides = np.diff(np.concatenate((triangles,triangles[:,[0],:]),axis=1));
@@ -283,7 +293,7 @@ class AdaptiveMesh(object):
 
     # update mesh
     logging.info("refining_broken_triangles(): adding %d points"%(nSamplePoints));
-    self.tri.add_points(new_domain_points)
+    self.__tri.add_points(new_domain_points)
     self.image = np.vstack((self.image,new_image_points));
     self.domain= np.vstack((self.domain,new_domain_points));      
     
@@ -294,22 +304,31 @@ class AdaptiveMesh(object):
       is_large ... function mask=is_large(triangles) that accepts a list of 
                      triangle vertices of shape (nTriangles, 3, 2) and returns 
                      a flag for each triangle indicating if it should be subdivided
+                     
+    Note: Additional points are added at the center of gravity of large triangles
+          and the Delaunay triangulation is recalculated. Edge flips can occur.
     """
-    ind = is_large(self.image[self.tri.simplices]);
+    # check if mesh is still a Delaunay mesh
+    if self.__tri is None:
+      raise RuntimeError('Mesh is no longer a Delaunay mesh. Subdivision not implemented for this case.');
+    
+    ind = is_large(self.image[self.simplices]);
     if np.sum(ind)==0: return; # nothing to do
     
     # add center of gravity for critical triangles
-    new_domain_points = np.sum(self.domain[self.tri.simplices[ind]],axis=1)/3;
-    self.tri.add_points(new_domain_points);
+    new_domain_points = np.sum(self.domain[self.simplices[ind]],axis=1)/3;
+    self.__tri.add_points(new_domain_points);
     logging.info("refining_large_triangles(): adding %d points"%(new_domain_points.shape[0]))
     
     # calculate image points and update data
     new_image_points = self.mapping(new_domain_points);
     self.image = np.vstack((self.image,new_image_points));
     self.domain= np.vstack((self.domain,new_domain_points));
+    self.simplices = self.__tri.simplices;
+    self.__tri = None;        
         
   def get_mesh(self):
-    return self.domain,self.image,self.tri;
+    return self.domain,self.image,self.simplices;
 
 
 
@@ -331,7 +350,7 @@ class AnalyzeTransmission(object):
     image_intensity = np.zeros(np.prod(image_shape)); # 1d array
 
     # field sampling
-    xx,yy=cartesian_sampling(3,3,rmax=.1)  
+    xx,yy=cartesian_sampling(3,3,rmax=1)  
     for i in xrange(len(xx)):
       x=xx[i]; y=yy[i];
       print("Field point: x=%5.3f, y=%5.3f"%(x,y))
@@ -346,34 +365,36 @@ class AnalyzeTransmission(object):
       Mesh=AdaptiveMesh(initial_sampling, raytrace);
 
       # iteratively perform refinement
-      #lthresh = 0.5*image_size[1];
-      #is_large= lambda(triangles): get_broken_triangles(triangles,lthresh);    
-      #for it in range(3): 
-      #  Mesh.refine_large_triangles(is_large);
-      #  if i==0: Mesh.plot_triangulation(skip_triangle=is_large);
-      lthresh = 0.5*image_size[1];
-      is_broken = lambda(triangles): get_broken_triangles(triangles,lthresh);  
-      Mesh.refine_broken_triangles(is_broken,bPlot=True);
-      if i==0: Mesh.plot_triangulation(skip_triangle=is_broken);      
+      if True:      
+        lthresh = 0.5*image_size[1];
+        is_large= lambda(triangles): get_broken_triangles(triangles,lthresh);    
+        for it in range(4): 
+          Mesh.refine_large_triangles(is_large);
+          if i==0: Mesh.plot_triangulation(skip_triangle=is_large);
+      else:
+        lthresh = 0.5*image_size[1];
+        is_broken = lambda(triangles): get_broken_triangles(triangles,lthresh);  
+        Mesh.refine_broken_triangles(is_broken,bPlot=True);
+        if i==0: Mesh.plot_triangulation(skip_triangle=is_broken);      
       
-      pupil_points, image_points, tri = Mesh.get_mesh();
+      pupil_points, image_points, simplices = Mesh.get_mesh();
       
         # analysis of beam intensity in each triangle (conservation of energy!) 
-      broken = get_broken_triangles(image_points[tri.simplices],lthresh=lthresh)  
-      pupil_area = get_area(pupil_points[tri.simplices]); 
+      broken = get_broken_triangles(image_points[simplices],lthresh=lthresh)  
+      pupil_area = get_area(pupil_points[simplices]); 
       assert(all(pupil_area>0));  # all triangles should be ccw oriented in pupil
       err_circ = 1-np.sum(pupil_area)/np.pi;    
       err_broken = np.sum(pupil_area[broken])/np.sum(pupil_area);
       logging.info('error of triangulation: \n' +
        '  %5.3f%% due to approx. of circular pupil boundary \n'%(err_circ*100) +
        '  %5.3f%% due to broken triangles' %(err_broken*100));
-      image_area = get_area(image_points[tri.simplices]);
+      image_area = get_area(image_points[simplices]);
       if any(image_area<0) and any(image_area>0):
         logging.warning('scambling of rays, triangulation may not be working')
       
       # footprint in image plane
       density = abs(pupil_area / image_area);
-      for s,vertices in enumerate(tri.simplices[~broken]):
+      for s,vertices in enumerate(simplices[~broken]):
         path = Path( image_points[vertices] );
         mask = path.contains_points(img_pixels);
         image_intensity += density[s]*mask;
