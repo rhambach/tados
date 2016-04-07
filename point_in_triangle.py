@@ -6,7 +6,7 @@ Created on Thu Apr 07 13:50:00 2016
 """
 import numpy as np
 
-def points_in_triangle(points,triangle):
+def point_in_triangle(points,triangle):
   """
   determines, if point is in given triangle (can be both arrays)
     points   ... coordinates of all points, array of shape (2,nPoints)
@@ -101,8 +101,10 @@ if __name__ == '__main__':
   points=np.random.randn(2,100);
   image =np.asarray(np.meshgrid(np.linspace(-2,1,1000),np.linspace(-3,2,1000)));
   
-  #test_few_points(points,triangles,PIT_crossproduct);
-  #test_image(image,triangles,PIT_crossproduct);
+  # test cross_product implementation
+  test_few_points(points,triangles,PIT_crossproduct);
+  test_image(image,triangles,PIT_crossproduct);
   
+  # test barycentric implementation
   test_few_points(points,triangles,PIT_barycentric);
   test_image(image,triangles,PIT_barycentric);
