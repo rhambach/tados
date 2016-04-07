@@ -404,7 +404,7 @@ class AnalyzeTransmission(object):
     wavenum  = 1;
     image_size = np.asarray((0.2,0.05));
     image_size = np.asarray((0.2,0.05));
-    image_shape = np.asarray((501,501));
+    image_shape = np.asarray((201,501));
     img_pixels = cartesian_sampling(*image_shape,rmax=2); # shape: (2,nPixels)
     img_pixels*= image_size[:,np.newaxis]/2;
     image_intensity = np.zeros(np.prod(image_shape)); # 1d array
@@ -460,7 +460,6 @@ class AnalyzeTransmission(object):
         triangle = image_points[simplices[s]];
         #path = Path( image_points[simplices[s]] );
         #mask = path.contains_points(img_pixels);
-        print img_pixels.shape
         mask = point_in_triangle.points_in_triangle(img_pixels,triangle);
         image_intensity += density[s]*mask;
       

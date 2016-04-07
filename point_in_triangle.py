@@ -11,20 +11,18 @@ def points_in_triangle(points,triangle):
   determines, if point is in given triangle (can be both arrays)
     points   ... coordinates of all points, array of shape (2,nPoints)
     triangle ... coordinates of a triangle, array of shape (3,2)
-  
-  implementation follows http://www.blackpawn.com/texts/pointinpoly/
   """
   assert (points.shape[0] == 2)
   assert (triangle.ndim<3 and triangle.shape == (3,2))
-  return PIT_crossproduct(points,triangle);
+  return PIT_barycentric(points,triangle);
   
   
   
 # Using cross product ----------------------------------------------------- 
 def same_side(p1,p2, a,b):
   """
-    check if p1 and p2 are on the same side of line through a and b
-    p1,p2, a,b ... coordinates of points, shape (2,nPoints)
+  check if p1 and p2 are on the same side of line through a and b
+  p1,p2, a,b ... coordinates of points, shape (2,nPoints)
   """
   # is orientation of triangle (a,b,p1) and (a,b,p2) the same ?
   return np.cross(b-a, p1-a,axis=0) * np.cross(b-a, p2-a,axis=0) >0;
@@ -33,10 +31,40 @@ def PIT_crossproduct(p, triangle):
   """
     implementation of point-in-triangle by determining,
     if point is on right side of each edge of the triangle
+
+    implementation follows http://www.blackpawn.com/texts/pointinpoly/
   """
   a,b,c = triangle.reshape((3,-1)+(1,)*(p.ndim-1));
   return same_side(p,a, b,c) & same_side(p,b, a,c) & same_side(p,c, a,b);
    
+# Using barycentric coordinates ------------------------------------------    
+def PIT_barycentric(p, triangle):
+  """
+  implementation of point-in-triangle by determining barycentric 
+  coordinate representatio of each points and checking coefficients
+
+  implementation follows http://www.blackpawn.com/texts/pointinpoly/
+  """  
+  a,b,c = triangle;       # shape: (2,)
+  ndim = np.ones(p.ndim); ndim[0]=-1;
+  # vectors  
+  v0 = c-a;               # shape: (2,)
+  v1 = b-a;               # "
+  v2 = p-a.reshape(ndim); # shape (2,nPoints,...)
+  # dot products
+  dot00=np.dot(v0,v0);        # scalar
+  dot01=np.dot(v0,v1); 
+  dot11=np.dot(v1,v1);
+  dot12=np.tensordot(v1,v2,axes=(0,0)); # shape:  (nPoints,...)
+  dot02=np.tensordot(v0,v2,axes=(0,0)); 
+  
+  # Compute barycentric coordinates
+  invDenom = 1. / (dot00 * dot11 - dot01 * dot01)
+  u = (dot11 * dot02 - dot01 * dot12) * invDenom
+  v = (dot00 * dot12 - dot01 * dot02) * invDenom
+
+  # Check if point is in triangle
+  return (u >= 0) & (v >= 0) & (u + v < 1);
 
 # Helper functions -------------------------------------------------------    
 def cyclic_path(triangles):
@@ -70,9 +98,11 @@ if __name__ == '__main__':
                           [[ 0.,   1.2], [ 1.,   0.1], [ 0.1,  0.2]],
                           [[ 0.1, -1.2], [-0.1,  0.2], [-1.1,  0.1]],
                           [[-0.5,    1], [  0,   0.3], [  -1, 0.2]],]);
-  
   points=np.random.randn(2,100);
   image =np.asarray(np.meshgrid(np.linspace(-2,1,1000),np.linspace(-3,2,1000)));
   
-  test_few_points(points,triangles,PIT_crossproduct);
-  test_image(image,triangles,PIT_crossproduct);
+  #test_few_points(points,triangles,PIT_crossproduct);
+  #test_image(image,triangles,PIT_crossproduct);
+  
+  test_few_points(points,triangles,PIT_barycentric);
+  test_image(image,triangles,PIT_barycentric);
