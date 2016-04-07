@@ -12,7 +12,8 @@ import logging
 import numpy as np
 import time
 import matplotlib.pylab as plt
-from matplotlib.path import Path
+#from matplotlib.path import Path
+import point_in_triangle
 
 class DDElinkHandler(object):
   """
@@ -399,13 +400,13 @@ class AnalyzeTransmission(object):
 
   def test(self):  
     # set up ray-trace parameters and image detector
-    image_surface = 24;
+    image_surface = 22;
     wavenum  = 1;
     image_size = np.asarray((0.2,0.05));
     image_size = np.asarray((0.2,0.05));
-    image_shape = np.asarray((101,101));
-    img_pixels = np.transpose(cartesian_sampling(*image_shape,rmax=2)); # shape: (nPixels,2)
-    img_pixels*= image_size/2;
+    image_shape = np.asarray((501,501));
+    img_pixels = cartesian_sampling(*image_shape,rmax=2); # shape: (2,nPixels)
+    img_pixels*= image_size[:,np.newaxis]/2;
     image_intensity = np.zeros(np.prod(image_shape)); # 1d array
 
     # field sampling
@@ -436,7 +437,7 @@ class AnalyzeTransmission(object):
         # segmentation of triangles along cutting line
         lthresh = 0.5*image_size[1];
         is_broken = lambda(triangles): get_broken_triangles(triangles,lthresh);  
-        Mesh.refine_broken_triangles(is_broken,nDivide=5,bPlot=True);
+        Mesh.refine_broken_triangles(is_broken,nDivide=100,bPlot=False);
         if i==0: Mesh.plot_triangulation(skip_triangle=is_broken);      
       pupil_points, image_points, simplices = Mesh.get_mesh();
   
@@ -456,8 +457,11 @@ class AnalyzeTransmission(object):
       # footprint in image plane
       density = abs(pupil_area / image_area);
       for s in np.where(~broken)[0]:
-        path = Path( image_points[simplices[s]] );
-        mask = path.contains_points(img_pixels);
+        triangle = image_points[simplices[s]];
+        #path = Path( image_points[simplices[s]] );
+        #mask = path.contains_points(img_pixels);
+        print img_pixels.shape
+        mask = point_in_triangle.points_in_triangle(img_pixels,triangle);
         image_intensity += density[s]*mask;
       
       if i==0:
@@ -468,10 +472,10 @@ class AnalyzeTransmission(object):
         plt.legend(loc='best');
  
     # plotting of footprint in image plane
-    img_pixels_2d = img_pixels.reshape(image_shape[1],image_shape[0],2);
+    img_pixels_2d = img_pixels.reshape(2,image_shape[1],image_shape[0]);
     image_intensity = image_intensity.reshape((image_shape[1],image_shape[0]))   
-    xaxis = img_pixels_2d[:,0,1];
-    yaxis = img_pixels_2d[0,:,0];
+    xaxis = img_pixels_2d[1,:,0];
+    yaxis = img_pixels_2d[0,0,:];
     
     fig,(ax1,ax2)= plt.subplots(2);
     ax1.set_title("footprint in image plane (surface: %d)"%image_surface);
