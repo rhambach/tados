@@ -143,14 +143,15 @@ class AdaptiveMesh(object):
         
      
 
-  def refine_broken_triangles(self,is_broken,nDivide=10,bPlot=False):
+  def refine_broken_triangles(self,is_broken,nDivide=10,bPlot=False,bPlotTriangles=[7]):
     """
     subdivide triangles which contain discontinuities in the image mesh
-      is_broken ... function mask=is_broken(triangles) that accepts a list of 
-                     triangle vertices of shape (nTriangles, 3, 2) and returns 
-                     a flag for each triangle indicating if it should be subdivided
-      nDivide   ... (opt) number of subdivisions of each side of broken triangle
-      bPlot     ... (opt) plot sampling and selected points for debugging 
+      is_broken  ... function mask=is_broken(triangles) that accepts a list of 
+                      triangle vertices of shape (nTriangles, 3, 2) and returns 
+                      a flag for each triangle indicating if it should be subdivided
+      nDivide    ... (opt) number of subdivisions of each side of broken triangle
+      bPlot      ... (opt) plot sampling and selected points for debugging 
+      bPlotTriangles (opt) list of triangle indices for which segmentation should be shown
 
     Note: The resulting mesh will be no longer a Delaunay mesh (identical points 
           might be present, circumference rule not guaranteed). Mesh functions, 
@@ -252,12 +253,12 @@ class AdaptiveMesh(object):
 
     # DEBUG subdivision of triangles
     if bPlot:
-      t=7;  # select index of triangle to look at
-      BCA=[B[t],C[t],A[t]]; subdiv=new_simplices[t::nTriangles,:];
-      pt=self.domain[BCA]; ax1.plot(pt[...,0],pt[...,1],'g')
-      pt=self.image[BCA];  ax2.plot(pt[...,0],pt[...,1],'g')
-      pt=self.domain[subdiv]; ax1.plot(pt[...,0],pt[...,1],'r')
-      pt=self.image[subdiv];  ax2.plot(pt[...,0],pt[...,1],'r')
+      for t in bPlotTriangles: # select index of triangle to look at
+        BCA=[B[t],C[t],A[t]]; subdiv=new_simplices[t::nTriangles,:];
+        pt=self.domain[BCA]; ax1.plot(pt[...,0],pt[...,1],'g')
+        pt=self.image[BCA];  ax2.plot(pt[...,0],pt[...,1],'g')
+        pt=self.domain[subdiv]; ax1.plot(pt[...,0],pt[...,1],'r')
+        pt=self.image[subdiv];  ax2.plot(pt[...,0],pt[...,1],'r')
 
     # we remove degenerated triangles (p1..4 identical ot A,B or C) 
     # and orient all triangles ccw in domain before adding them to the list of simplices
