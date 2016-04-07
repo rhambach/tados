@@ -96,7 +96,7 @@ class DDElinkHandler(object):
     #print("zArrayTrace: %ds"%(time.time()-t))
 #
     # collect results
-    results = np.asarray( [(r.x,r.y,r.z,r.l,r.m,r.n,r.error) for r in rays[1:]] );
+    results = np.asarray( [(r.x,r.y,r.z,r.l,r.m,r.n,r.vigcode,r.error) for r in rays[1:]] );
     #print("retrive data: %ds"%(time.time()-t))    
     return results;
 
@@ -246,53 +246,6 @@ class AdaptiveMesh(object):
     if nTriangles==0: return;                 # noting to do!
     nPointsOrigMesh = self.image.shape[0];  
     
-    # for each broken triangle, get vertex points in domain
-    triangles = self.domain[self.simplices[broken]]; # shape (nTriangles,3,2)
-    
-    # create dense sampling along edges of broken triangles
-    # follow regular sampling on A->B->C->A in domain
-    x = np.linspace(0,1,nDivide,endpoint=False);
-    A,B,C = np.rollaxis(triangles,1);  # vertex points of shape (nTriangles,2)
-    AB = np.outer(1-x,A)+np.outer(x,B); # subdivision of shape (Ndivide,nTriangles*2)
-    BC = np.outer(1-x,B)+np.outer(x,C);
-    CA = np.outer(1-x,C)+np.outer(x,A);
-    domain_points = np.concatenate((AB,BC,CA,A.reshape(1,2*nTriangles)),axis=0);
-    nSamplePoints = 3*nDivide+1;        # shape (nSamplePoints,nTriangles*2) 
-    
-    # calculate position of intermeiate points in image space
-    image_points = self.mapping(domain_points.reshape(-1,2));
-    sides = np.diff(image_points.reshape(nSamplePoints,nTriangles,2),axis=0);
-    sides = np.sum(sides**2,axis=-1);  # shape (nSamplePoints-1,nTriangle)
-    
-    # there should be exactly two very long segments per triangle (crossing the discontinuity)
-    largest_segments = np.argpartition(sides,-2,axis=0)[-2:]; 
-                      # indices of two largest segments, shape (2,nTriangle)
-    # we add the two end points of each of the largest segments to the mesh
-    # (for each broken triangle we thus add 4 points)
-    ind_first_point = largest_segments.T.flatten(); # index of first end point of segments
-    ind_second_point= ind_first_point+1;            # index of second end point of segment
-    ind_end_points = np.vstack((ind_first_point,ind_second_point)).T.flatten();
-      # shape nTriangles*4, order 2x(first end point, second end point), next triangle
-    ind_triangle = np.arange(nTriangles).repeat(4);
-      # corresponding triangle index, shape nTriangles*4
-    new_domain_points = domain_points.reshape((nSamplePoints,nTriangles,2))[ind_end_points,ind_triangle];
-    new_image_points = image_points.reshape((nSamplePoints,nTriangles,2))[ind_end_points,ind_triangle];
-      # shape (nTriangles*4,2), reshaped as (nTriangles,4,2)
-
-    # update points in mesh
-    logging.info("refining_broken_triangles(): adding %d points"%(nSamplePoints));
-    self.image = np.vstack((self.image,new_image_points));              # no longer unique points
-    self.domain= np.vstack((self.domain,new_domain_points));
-
-    if bPlot:   
-      fig = self.plot_triangulation(skip_triangle=is_broken);
-      ax1,ax2 = fig.axes;
-      ax1.plot(domain_points[:,0::2].flat,domain_points[:,1::2].flat,'k.',label='test points');
-      ax1.plot(new_domain_points[...,0].flat,new_domain_points[...,1].flat,'r.',label='selected points');
-      ax1.legend(loc=0);      
-      ax2.plot(image_points[:,0],image_points[:,1],'k.')
-      ax2.plot(new_image_points[...,0].flat,new_image_points[...,1].flat,'r.',label='selected points');
-
     # add new simplices:
     # segmentation of each broken triangle is generated in a cyclic manner,
     # starting with isolated point C and the two closest new sampling points
@@ -324,15 +277,50 @@ class AdaptiveMesh(object):
     A = simplices[ind_triangle,min_edge];           # first point of shortest side
     B = simplices[ind_triangle,(min_edge+1)%3];     # second point of shortest side
     C = simplices[ind_triangle,(min_edge+2)%3];     # point opposit to shortest side
-    # order new sampling points by distance to C in image space
-    dist = np.sum( (new_image_points - self.image[C].repeat(4,axis=0))**2, axis=1); # shape (nTriangles*4)
-    sort_indices = np.argsort(dist.reshape(nTriangles,4),axis=1);  # shape (nTriangles,4), index in new_image_points array
-    # calculate indices of sorted points 
-    # Note: we offset indices by number of points in original triangulation
-    new_points_index = np.arange(nTriangles*4).reshape(nTriangles,4) + nPointsOrigMesh;  
-    ind_triangle = np.arange(nTriangles).repeat(4).reshape(nTriangles,4);    
-    p1,p2,p3,p4 = new_points_index[ind_triangle,sort_indices].T; # shape(nTriangles)
+    
+    # create dense sampling along C->B and C->A in domain space
+    x = np.linspace(0,1,nDivide,endpoint=True);
+    CA = np.outer(1-x,self.domain[C]) + np.outer(x,self.domain[A]);
+    CB = np.outer(1-x,self.domain[C]) + np.outer(x,self.domain[B]);
+                                                    # sampling of shape (Ndivide,nTriangles*2)    
+    # map sampling on CA and CB to image space and measure length of segments in image space
+    domain_points= np.hstack((CA,CB)).reshape(nDivide,2,nTriangles,2);
+    image_points = self.mapping(domain_points.reshape(-1,2)).reshape(nDivide,2,nTriangles,2);
+    len_segments = np.sum(np.diff(image_points,axis=0)**2,axis=-1); 
+                                                    # shape (nDivide-1,2,nTriangle)
+    # determine indices of broken segments (largest elements in CA and CB)
+    largest_segments = np.argmax(len_segments,axis=0); # shape (2,nTriangle) 
+    edge_points = np.asarray((largest_segments,largest_segments+1));
+                                                    # shape (2,2,nTriangle)
  
+    # set points p1 ... p4 for segmentation of triangle
+    # see http://stackoverflow.com/questions/15660885/correctly-indexing-a-multidimensional-numpy-array-with-another-array-of-indices
+    idx_tuple = (edge_points[...,np.newaxis],) + tuple(np.ogrid[:2,:nTriangles,:2]);
+    new_domain_points = domain_points[idx_tuple];
+    new_image_points  = image_points[idx_tuple];    
+              # shape (2,2,nTriangle,2), indicating iDistance,iEdge,iTriangle,(x/y)
+ 
+    # update points in mesh (points are no longer unique!)
+    logging.info("refining_broken_triangles(): adding %d points"%(4*nTriangles));
+    self.image = np.vstack((self.image,new_image_points.reshape(-1,2))); 
+    self.domain= np.vstack((self.domain,new_domain_points.reshape(-1,2)));    
+   
+    if bPlot:   
+      fig = self.plot_triangulation(skip_triangle=is_broken);
+      ax1,ax2 = fig.axes;
+      ax1.plot(domain_points[...,0].flat,domain_points[...,1].flat,'k.',label='test points');
+      ax1.plot(new_domain_points[...,0].flat,new_domain_points[...,1].flat,'g.',label='selected points');
+      ax1.legend(loc=0);      
+      ax2.plot(image_points[...,0].flat,image_points[...,1].flat,'k.')
+      ax2.plot(new_image_points[...,0].flat,new_image_points[...,1].flat,'g.',label='selected points');   
+    
+    # indices for points p1 ... p4 in new list of points self.domain 
+    # (offset by number of points in the original mesh!)
+    # Note: by construction, the order of p1 ... p4 corresponds exactly to the order
+    #       shown above (first tuple contains points closest to C,
+    #       first on CA, then on CB, second tuple beyond the discontinuity)
+    (p1,p2),(p3,p4) = np.arange(4*nTriangles).reshape(2,2,nTriangles) + nPointsOrigMesh;
+                                                    # shape (nTriangles,)
     # construct the five triangles from points
     t1=np.vstack((C,p1,p2));                        # shape (3,nTriangles)
     t2=np.vstack((p1,p2,p3));
@@ -344,10 +332,6 @@ class AdaptiveMesh(object):
 
     # DEBUG subdivision of triangles
     if bPlot:
-      old = np.sum(np.abs(get_area(self.domain[simplices])));
-      new = np.sum(np.abs(get_area(self.domain[new_simplices])))
-      print old,new
-      #assert(abs((old-new)/old)<1e-10)
       t=7;  # select index of triangle to look at
       BCA=[B[t],C[t],A[t]]; subdiv=new_simplices[t::nTriangles,:];
       pt=self.domain[BCA]; ax1.plot(pt[...,0],pt[...,1],'g')
@@ -359,12 +343,18 @@ class AdaptiveMesh(object):
     # and orient all triangles ccw in domain before adding them to the list of simplices
     area = get_area(self.domain[new_simplices]);
     new_simplices[area<0] = new_simplices[area<0,::-1]; # reverse cw triangles
-    new_simplices = new_simplices[np.abs(area)>0];             # remove degenerate triangles
+    new_simplices = new_simplices[area<>0];             # remove degenerate triangles
 
+    # sanity check that total area did not change after segmentation
+    old = np.sum(np.abs(get_area(self.domain[simplices])));
+    new = np.sum(np.abs(get_area(self.domain[new_simplices])))
+    assert(abs((old-new)/old)<1e-10) # segmentation of triangle has no holes/overlaps
+      
     # update simplices in mesh    
     self.__tri = None; # delete initial Delaunay triangulation        
     self.simplices=np.vstack((self.simplices[~broken], new_simplices)); # no longer Delaunay
 
+   
     
     
   def refine_large_triangles(self,is_large):
@@ -409,7 +399,7 @@ class AnalyzeTransmission(object):
 
   def test(self):  
     # set up ray-trace parameters and image detector
-    image_surface = 22;
+    image_surface = 24;
     wavenum  = 1;
     image_size = np.asarray((0.2,0.05));
     image_size = np.asarray((0.2,0.05));
@@ -425,37 +415,32 @@ class AnalyzeTransmission(object):
       print("Field point: x=%5.3f, y=%5.3f"%(x,y))
       
       # init adaptive mesh for pupil sampling
-      px,py=fibonacci_sampling_with_circular_boundary(100,2*np.sqrt(500))  
+      px,py=fibonacci_sampling_with_circular_boundary(200,2*np.sqrt(500))  
       initial_sampling = np.vstack((px,py)).T;         # size (nPoints,2)
       def raytrace(pupil_points):        # local function for raytrace
         px,py = pupil_points.T;
         ret = self.hDDE.trace_rays(x,y,px,py,wavenum,surf=image_surface);
-        return ret[:,[0,1]];
+        vigcode = ret[:,[6]]<>0;        # include vignetting by shifting ray outside image
+        return ret[:,[0,1]]+image_size*vigcode;
       Mesh=AdaptiveMesh(initial_sampling, raytrace);
 
-      # iteratively perform refinement
-      pupil_points, image_points, simplices = Mesh.get_mesh();
-      before = np.sum(np.abs(get_area(pupil_points[simplices])));
-      
-      if False:      
+      # mesh refinement  
+      if False:  
+        # iterative refinement of broken triangles
         lthresh = 0.5*image_size[1];
         is_large= lambda(triangles): get_broken_triangles(triangles,lthresh);    
         for it in range(4): 
           Mesh.refine_large_triangles(is_large);
           if i==0: Mesh.plot_triangulation(skip_triangle=is_large);
       else:
+        # segmentation of triangles along cutting line
         lthresh = 0.5*image_size[1];
         is_broken = lambda(triangles): get_broken_triangles(triangles,lthresh);  
         Mesh.refine_broken_triangles(is_broken,nDivide=5,bPlot=True);
-        Mesh.plot_triangulation(skip_triangle=is_broken);      
-      
+        if i==0: Mesh.plot_triangulation(skip_triangle=is_broken);      
       pupil_points, image_points, simplices = Mesh.get_mesh();
-      after = np.sum(np.abs(get_area(pupil_points[simplices])));      
-      
-      print before, after
-      #assert(abs((before-after)/before)<1e-10)
-      
-        # analysis of beam intensity in each triangle (conservation of energy!) 
+  
+      # analysis of beam intensity in each triangle (conservation of energy!) 
       broken = get_broken_triangles(image_points[simplices],lthresh=lthresh)  
       pupil_area = get_area(pupil_points[simplices]); 
       assert(all(pupil_area>0));  # triangles should be oriented ccw in pupil
@@ -512,8 +497,7 @@ if __name__ == '__main__':
     # load example file
     #filename = os.path.join(ln.zGetPath()[1], 'Sequential', 'Objectives', 
     #                        'Cooke 40 degree field.zmx')
-    filename = 'X:/projekte/1507_image_slicer/zemax/10_complete_system';
-    filename+= '/12_catalog_optics_1mm_pupil_point_source_with_slicer_tolerancing.ZMX';
+    filename= os.path.realpath('./tests/pupil_slicer.ZMX');
     
     hDDE.load(filename);
     
