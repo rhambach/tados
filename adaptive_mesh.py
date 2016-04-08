@@ -100,7 +100,7 @@ class AdaptiveMesh(object):
           
     fig,(ax1,ax2)= plt.subplots(2);
     ax1.set_title("Sampling + Triangulation in Domain");
-    if skip_triangle is not None:
+    if skip_triangle is not None and np.sum(skip)>0:
       ax1.triplot(self.domain[:,0], self.domain[:,1], skipped_simplices,'k:');
     ax1.triplot(self.domain[:,0], self.domain[:,1], simplices,'b-');    
     ax1.plot(self.initial_domain[:,0],self.initial_domain[:,1],'r.')
