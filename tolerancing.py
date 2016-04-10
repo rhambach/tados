@@ -15,35 +15,45 @@ class ToleranceSystem(object):
     self.hDDE=hDDE;
     self.ln = hDDE.link;
     self.filename=filename;
-    
-    hDDE.load(filename);
-    self.ln.zPushLens(1);
-
-    self.numSurf = self.ln.zGetNumSurf();
-    self.__is_real = np.ones(self.numSurf,dtype=bool); # index array for real surfaces
-    self.__R0, self.__t0 = self.__get_surface_coordinates();
-    
+    self.reset();
+        
     
   def __get_surface_coordinates(self):
     """
     returns for each surface in the system, the global rotation matrix 
-           | R11  R12  R13 |                   | X |
-      R =  | R21  R22  R23 | and shift   t =   | Y |
-           | R31  R32  R33 |                   | Z |
+           | R11  R12  R13 |                 | X |
+      R =  | R21  R22  R23 | and shift   t = | Y |
+           | R31  R32  R33 |                 | Z |
     Returns: (R,t) of shape (numSurf,3,3) and (numSurf,3) respectively
     """    
-    real_surfaces = np.where(self.__is_real)[0];  # list of real surfaces (no additional coordinate breaks)
-    assert( len(real_surfaces)==self.numSurf);    # number of real surfaces should not change
-    coords = [ self.ln.zGetGlobalMatrix(s) for s in real_surfaces ]
+    coords = [ self.ln.zGetGlobalMatrix(s) for s in self.__real2all]
     coords = np.asarray(coords);
     R = coords[:,0:9].reshape(self.numSurf,3,3);
     t = coords[:,9:12];
     return R,t
     
   def __get_surface_comments(self):
-    real_surfaces = np.where(self.__is_real)[0];
-    return [ self.ln.zGetComment(s) for s in real_surfaces];
+    return [ self.ln.zGetComment(s) for s in self.__real2all];
     
+  def __register_dummy_surfaces(self,surf):
+    """ 
+    register dummy surfaces for keeping track of real surfaces 
+    in optical system during tolerancing, use following index arrays
+    to convert between real and all surfaces including dummies and coord-breaks:
+      __all2real ... converst from surface index to original surface index (or -1)
+      __real2all ... gives index of original surface in current system
+    """
+    # calculate indices where to insert False in __isRealSurf
+    insert_at=np.sort(surf)-np.arange(len(surf));
+    self.__isRealSurf = np.insert(self.__isRealSurf,insert_at,False);
+    numAll = self.__isRealSurf.size;
+    self.__all2real= (-1)*np.ones(numAll);
+    self.__all2real[self.__isRealSurf]=np.arange(self.numSurf);
+    self.__real2all=np.arange(numAll)[self.__isRealSurf]      
+    assert(np.all(self.__isRealSurf[list(surf)]==False));
+    assert( len(self.__real2all)==self.numSurf );
+
+  
   def print_LDE(self,bShowDummySurfaces=False):
     print self.ln.ipzGetLDE();
 
@@ -61,19 +71,19 @@ class ToleranceSystem(object):
       print " system unchanged."
       return
   
-    print "   surface     shift           tilt "
+    print "   surface     shift    tilt     comment"
     for s in xrange(numSurf):
       print "  %2d: "%s,
-      # check for translation
-      x,y,z=dt[s]
-      if   x==0 and y==0 and z==0: print "          ",
-      elif x==0 and y==0 and z<>0: print "DZ: %5.3f,"%z,
-      elif x==0 and y<>0 and z==0: print "DY: %5.3f,"%y,
-      elif x<>0 and y==0 and z==0: print "DX: %5.3f,"%x,
-      else:                        print "(%3.2f,%3.2f,%5.2f)"%(x,y,z),
+      # check for translation (with precision of 10^-8 lens units)
+      x,y,z=np.round(dt[s],decimals=8);
+      if   x==0 and y==0 and z==0: print "                    ",
+      elif x==0 and y==0 and z<>0: print "DZ: %5.3f,          "%z,
+      elif x==0 and y<>0 and z==0: print "DY: %5.3f,          "%y,
+      elif x<>0 and y==0 and z==0: print "DX: %5.3f,          "%x,
+      else:                        print "(%5.2f,%5.2f,%5.2f),"%(x,y,z),
       
-      # check for rotations
-      x,y,z = np.linalg.norm(dR[s],axis=1);
+      # check for rotations (with precision of 10^-8 lens units)
+      x,y,z = np.round(np.linalg.norm(dR[s],axis=1),decimals=8);
       if   x==0 and y==0 and z==0: print "    ",
       elif x==0:                   print "XROT",
       elif x==0 and y<>0 and z==0: print "YROT",
@@ -84,7 +94,7 @@ class ToleranceSystem(object):
       else: print ""
     
     
-  def tilt_decenter_elements(self,*args,**kwargs):
+  def tilt_decenter_elements(self,firstSurf,lastSurf,**kwargs):
     """
     Wrapper for pyzDDE.zTiltDecenterElements(firstSurf, lastSurf, xdec=0.0, ydec=0.0, 
       xtilt=0.0, ytilt=0.0, ztilt=0.0, order=0, cbComment1=None, cbComment2=None, dummySemiDiaToZero=False)
@@ -93,11 +103,15 @@ class ToleranceSystem(object):
     
     returns surface numbers of added surfaces (triple of ints)     
     """
-    s1,s2,s3 = np.sort(self.ln.zTiltDecenterElements(*args,**kwargs));
-    self.__is_real = np.insert(self.__is_real,(s1,s2-1,s3-2),False);
-    assert(np.all(self.__is_real[[s1,s2,s3]]==False));
+    # calculate real surface indices and check, that there are no
+    # coordinate breaks or dummy surfaces between these
+    s1,s2 = self.__real2all[[firstSurf,lastSurf]]; 
+    if not all(self.__isRealSurf[s1:s2+1]):
+      raise RuntimeError("Elements (surface ranges) are not allowed to overlap in tolerancing.");
+    added_surf = self.ln.zTiltDecenterElements(s1,s2,**kwargs);
+    self.__register_dummy_surfaces(added_surf);
     ret = self.ln.zPushLens(1);
-    if ret==0:  return s1,s2,s3;
+    if ret==0:  return added_surf;
     else: return ret;
 
   def change_thickness(self,surf=0,adjust_surf=0,value=0):
@@ -111,14 +125,21 @@ class ToleranceSystem(object):
       value      ... thickness variation in lens units
           
     """
-    self.ln.zSetSurfaceData(surfNum=surf, code=self.ln.SDAT_THICK, value=value);
+    # calculate real surface indices  and check, that there are no
+    # coordinate breaks or dummy surfaces between these
+    s1,s2 = self.__real2all[[surf,adjust_surf]]; 
+    if not all(self.__isRealSurf[s1:s2+1]):
+      raise RuntimeError("Elements (surface ranges) are not allowed to overlap in tolerancing.");
+    t1=self.ln.zGetThickness(s1);
+    self.ln.zSetThickness(s1,value=t1+value);
     if adjust_surf>surf:  
-      self.ln.zSetSurfaceData(surfNum=adjust_surf, code=self.ln.SDAT_THICK, value=-value);
+      t2=self.ln.zGetThickness(s2);
+      self.ln.zSetThickness(s2,value=t2-value);
     return self.ln.zPushLens(1);
 
   # Wrapper for simulating ZEMAX operands follow
   def TTHI(self,surf,adjust_surf,val):
-    return self.change_thickness(val,surf,adjust_surf=adjust_surf);
+    return self.change_thickness(surf,adjust_surf=adjust_surf,value=val);
   def TEDX(self,firstSurf,lastSurf,val):
     return self.tilt_decenter_elements(firstSurf,lastSurf,xdec=val)
   def TEDY(self,firstSurf,lastSurf,val):
@@ -130,6 +151,17 @@ class ToleranceSystem(object):
   def TETZ(self,firstSurf,lastSurf,val):
     return self.tilt_decenter_elements(firstSurf,lastSurf,ztilt=val)
     
+  def reset(self):
+    " reset system to original state"
+    hDDE.load(self.filename);
+    self.ln.zPushLens(1);
+
+    self.numSurf = self.ln.zGetNumSurf();
+    # index arrays for conversion between real and all surfaces
+    self.__isRealSurf = np.ones(self.numSurf,dtype=bool);
+    self.__real2all = np.arange(self.numSurf);
+    self.__all2real = np.arange(self.numSurf);    
+    self.__R0, self.__t0 = self.__get_surface_coordinates();
 
 
 if __name__ == '__main__':
@@ -143,9 +175,10 @@ if __name__ == '__main__':
     tol=ToleranceSystem(hDDE,filename);
     tol.print_LDE();
   
-    tol.change_thickness(5, value=2)
+    tol.change_thickness(5,12,value=2);
     tol.tilt_decenter_elements(1,3,ydec=0.02);  # [mm]
     tol.TETX(1,3,0.001)
+    tol.TTHI(1,2,0.01)
     tol.print_current_geometric_changes();
     #  changes to system by hand:
     #
