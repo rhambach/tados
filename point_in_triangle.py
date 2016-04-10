@@ -16,8 +16,6 @@ def point_in_triangle(points,triangle):
   assert (triangle.ndim<3 and triangle.shape == (3,2))
   return PIT_barycentric(points,triangle);
   
-  
-  
 # Using cross product ----------------------------------------------------- 
 def same_side(p1,p2, a,b):
   """

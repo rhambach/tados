@@ -8,36 +8,6 @@ import numpy as np
 import matplotlib.pylab as plt
 import logging
 
-def get_area(triangles):
-  """
-  calculate signed area of each triangle in given list
-    triangles ... list of size (nTriangles,3,2) x and y coordinates 
-                  for each vertex in each triangle  
-  Returns:
-    1d vector of size nTriangles containing the signed area of each triangle
-    (positive: ccw orientation, negative: cw orientation of vertices)
-  """
-  x,y = triangles.T;
-  # See http://geomalgorithms.com/a01-_area.html#2D%20Polygons
-  return 0.5 * ( (x[1]-x[0])*(y[2]-y[0]) - (x[2]-x[0])*(y[1]-y[0]) );
-
-
-def get_broken_triangles(triangles,lthresh=None):
-  """
-  try to identify triangles that are cut or vignetted
-    triangles ... list of size (nTriangles,3,2) x and y coordinates 
-                  for each vertex in each triangle  
-    lthresh   ... threshold for longest side of broken triangle 
-  Returns:
-    1d vector of size nTriangles indicating if triangle is broken
-  """
-  # calculate maximum of (squared) length of two sides of each triangle 
-  # (X[0]-X[1])**2 + (Y[0]-Y[1])**2; (X[1]-X[2])**2 + (Y[1]-Y[2])**2 
-  max_lensq = np.max(np.sum(np.diff(triangles,axis=1)**2,axis=2),axis=1);
-  # mark triangle as broken, if max side is 10 times larger than median value
-  if lthresh is None: lthresh = 3*np.sqrt(np.median(max_lensq));
-  return max_lensq > lthresh**2;
-
 
 class AdaptiveMesh(object):
   """
@@ -87,14 +57,14 @@ class AdaptiveMesh(object):
   def plot_triangulation(self,skip_triangle=None):
     """
     plot current triangulation of adaptive mesh in domain and image space
-      skip_triangle... (opt) function mask=skip_triangle(triangles) that accepts a list of 
-                     triangle vertices of shape (nTriangles, 3, 2) and returns 
-                     a flag for each triangle indicating that it should not be drawn
+      skip_triangle... (opt) function mask=skip_triangle(simplices) that accepts a list of 
+                     simplices of shape (nTriangles, 3) and returns a flag 
+                     for each triangle indicating that it should not be drawn
     returns figure handle;
     """ 
     simplices = self.simplices.copy();
     if skip_triangle is not None:
-      skip = skip_triangle(self.image[simplices]);
+      skip = skip_triangle(simplices);
       skipped_simplices=simplices[skip];
       simplices=simplices[~skip];
           
@@ -110,15 +80,57 @@ class AdaptiveMesh(object):
     ax2.plot(self.initial_image[:,0],self.initial_image[:,1],'r.')
 
     return fig;
-    
+
+
+  def get_area_in_domain(self,simplices=None):
+    """
+    calculate signed area of given simplices in domain space
+      simplices ... (opt) list of simplices, shape (nTriangles,3)
+    Returns:
+      1d vector of size nTriangles containing the signed area of each triangle
+      (positive: ccw orientation, negative: cw orientation of vertices)
+    """
+    if simplices is None: simplices = self.simplices;    
+    x,y = self.domain[simplices].T;
+    # See http://geomalgorithms.com/a01-_area.html#2D%20Polygons
+    return 0.5 * ( (x[1]-x[0])*(y[2]-y[0]) - (x[2]-x[0])*(y[1]-y[0]) );
+
+  def get_area_in_image(self,simplices=None):
+    """
+    calculate signed area of given simplices in image space
+    (see get_area_in_domain())
+    """
+    if simplices is None: simplices = self.simplices;    
+    x,y = self.image[simplices].T;
+    # See http://geomalgorithms.com/a01-_area.html#2D%20Polygons
+    return 0.5 * ( (x[1]-x[0])*(y[2]-y[0]) - (x[2]-x[0])*(y[1]-y[0]) );
+  
+  
+  def get_broken_triangles(self,simplices=None,lthresh=None):
+    """
+    try to identify triangles that are cut or vignetted in image space
+      simplices ... (opt) list of simplices, shape (nTriangles,3)  
+      lthresh   ... (opt) threshold for longest side of broken triangle 
+    Returns:
+      1d vector of size nTriangles indicating if triangle is broken
+    """
+    if simplices is None: simplices = self.simplices;    
+    # x and y coordinates for each vertex in each triangle 
+    triangles = self.image[simplices]    
+    # calculate maximum of (squared) length of two sides of each triangle 
+    # (X[0]-X[1])**2 + (Y[0]-Y[1])**2; (X[1]-X[2])**2 + (Y[1]-Y[2])**2 
+    max_lensq = np.max(np.sum(np.diff(triangles,axis=1)**2,axis=2),axis=1);
+    # mark triangle as broken, if max side is 10 times larger than median value
+    if lthresh is None: lthresh = 3*np.sqrt(np.median(max_lensq));
+    return max_lensq > lthresh**2;
  
         
   def refine_large_triangles(self,is_large):
     """
     subdivide large triangles in the image mesh
       is_large ... function mask=is_large(triangles) that accepts a list of 
-                     triangle vertices of shape (nTriangles, 3, 2) and returns 
-                     a flag for each triangle indicating if it should be subdivided
+                     simplices of shape (nTriangles, 3) and returns a flag 
+                     for each triangle indicating if it should be subdivided
                      
     Note: Additional points are added at the center of gravity of large triangles
           and the Delaunay triangulation is recalculated. Edge flips can occur.
@@ -127,7 +139,7 @@ class AdaptiveMesh(object):
     if self.__tri is None:
       raise RuntimeError('Mesh is no longer a Delaunay mesh. Subdivision not implemented for this case.');
     
-    ind = is_large(self.image[self.simplices]);
+    ind = is_large(self.simplices);
     if np.sum(ind)==0: return; # nothing to do
     
     # add center of gravity for critical triangles
@@ -147,8 +159,8 @@ class AdaptiveMesh(object):
     """
     subdivide triangles which contain discontinuities in the image mesh
       is_broken  ... function mask=is_broken(triangles) that accepts a list of 
-                      triangle vertices of shape (nTriangles, 3, 2) and returns 
-                      a flag for each triangle indicating if it should be subdivided
+                      simplices of shape (nTriangles, 3) and returns a flag 
+                      for each triangle indicating if it should be subdivided
       nDivide    ... (opt) number of subdivisions of each side of broken triangle
       bPlot      ... (opt) plot sampling and selected points for debugging 
       bPlotTriangles (opt) list of triangle indices for which segmentation should be shown
@@ -157,12 +169,8 @@ class AdaptiveMesh(object):
           might be present, circumference rule not guaranteed). Mesh functions, 
           that need this property (like refine_large_triangles()) will not work
           after calling this function.
-    
-    Todo: we might save 33% - 66% of the effort on calculating the mapping between
-          domain and image (here: ray-trace) by recognizing identical sampling points
-          and selecting the two broken sides of the triangle in advance
     """
-    broken = is_broken(self.image[self.simplices]);
+    broken = is_broken(self.simplices);
     nTriangles = np.sum(broken)
     if nTriangles==0: return;                 # noting to do!
     nPointsOrigMesh = self.image.shape[0];  
@@ -262,13 +270,13 @@ class AdaptiveMesh(object):
 
     # we remove degenerated triangles (p1..4 identical ot A,B or C) 
     # and orient all triangles ccw in domain before adding them to the list of simplices
-    area = get_area(self.domain[new_simplices]);
+    area = self.get_area_in_domain(new_simplices);
     new_simplices[area<0] = new_simplices[area<0,::-1]; # reverse cw triangles
     new_simplices = new_simplices[area<>0];             # remove degenerate triangles
 
     # sanity check that total area did not change after segmentation
-    old = np.sum(np.abs(get_area(self.domain[simplices])));
-    new = np.sum(np.abs(get_area(self.domain[new_simplices])))
+    old = np.sum(np.abs(self.get_area_in_domain(simplices)));
+    new = np.sum(np.abs(self.get_area_in_domain(new_simplices)));
     assert(abs((old-new)/old)<1e-10) # segmentation of triangle has no holes/overlaps
       
     # update simplices in mesh    

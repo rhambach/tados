@@ -44,28 +44,28 @@ def analyze_transmission(hDDE):
     if False:  
       # iterative refinement of broken triangles
       lthresh = 0.5*image_size[1];
-      is_large= lambda(triangles): get_broken_triangles(triangles,lthresh);    
+      is_large= lambda(simplices): Mesh.get_broken_triangles(simplices=simplices,lthresh=lthresh);    
       for it in range(4): 
         Mesh.refine_large_triangles(is_large);
         if i==0: Mesh.plot_triangulation(skip_triangle=is_large);
     else:
       # segmentation of triangles along cutting line
       lthresh = 0.5*image_size[1];
-      is_broken = lambda(triangles): get_broken_triangles(triangles,lthresh);  
+      is_broken = lambda(simplices): Mesh.get_broken_triangles(simplices=simplices,lthresh=lthresh);  
       Mesh.refine_broken_triangles(is_broken,nDivide=100,bPlot=False);
       if i==0: Mesh.plot_triangulation(skip_triangle=is_broken);      
     pupil_points, image_points, simplices = Mesh.get_mesh();
 
     # analysis of beam intensity in each triangle (conservation of energy!) 
-    broken = get_broken_triangles(image_points[simplices],lthresh=lthresh)  
-    pupil_area = get_area(pupil_points[simplices]); 
+    broken = Mesh.get_broken_triangles(lthresh=lthresh)  
+    pupil_area = Mesh.get_area_in_domain(); 
     assert(all(pupil_area>0));  # triangles should be oriented ccw in pupil
     err_circ = 1-np.sum(pupil_area)/np.pi;    
     err_broken = np.sum(pupil_area[broken])/np.sum(pupil_area);
     logging.info('error of triangulation: \n' +
      '  %5.3f%% due to approx. of circular pupil boundary \n'%(err_circ*100) +
      '  %5.3f%% due to broken triangles' %(err_broken*100));
-    image_area = get_area(image_points[simplices]);
+    image_area = Mesh.get_area_in_image();
     if any(image_area<0) and any(image_area>0):
       logging.warning('scambling of rays, triangulation may not be working')
     
