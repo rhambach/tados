@@ -29,10 +29,11 @@ def analyze_transmission(hDDE):
   image_intensity = np.zeros(np.prod(image_shape)); # 1d array
 
   # field sampling (octagonal fiber)
-  xx,yy=cartesian_sampling(7,7,rmax=.02);  # low: 11x11, high: 7x7
+  xx,yy=cartesian_sampling(7,7,rmax=.2);  # low: 11x11, high: 7x7
   ind = (np.abs(xx)<=1) & (np.abs(yy)<=1) & \
               (np.abs(xx+yy)<=np.sqrt(2)) & (np.abs(xx-yy)<=np.sqrt(2));
   xx=xx[ind]; yy=yy[ind];
+  nFieldPoints = np.sum(ind);
   plt.figure(); plt.title("field sampling (normalized coordinates)");
   plt.plot(xx.flat,yy.flat,'.')
   plt.xlabel('x'); plt.ylabel('y');
@@ -40,7 +41,7 @@ def analyze_transmission(hDDE):
   
   for i in xrange(len(xx)):
     x=xx[i]; y=yy[i];
-    x=0.3333333333333; y=0.666666666666;
+    #x=0.3333333333333; y=0.666666666666;
     print("Field point: x=%5.3f, y=%5.3f"%(x,y))
     
     # init adaptive mesh for pupil sampling☺
@@ -61,9 +62,11 @@ def analyze_transmission(hDDE):
       area   = Mesh.get_area_in_domain(simplices=simplices);
       return broken & (area>Athresh)  
     while True:  # iteratively refine broken triangles
-      nNew = Mesh.refine_broken_triangles(is_broken,nDivide=100,bPlot=True);
+      nNew = Mesh.refine_broken_triangles(is_broken,nDivide=100,bPlot=(i==0));
       if nNew==0: break # no additional triangles added
-      if i==0: Mesh.plot_triangulation(skip_triangle=is_broken);
+      if i==0: 
+        skip = lambda(simplices): Mesh.get_broken_triangles(simplices=simplices,lthresh=lthresh)        
+        Mesh.plot_triangulation(skip_triangle=skip);
     pupil_points, image_points, simplices = Mesh.get_mesh();
 
     # analysis of beam intensity in each triangle (conservation of energy!) 
@@ -81,7 +84,7 @@ def analyze_transmission(hDDE):
       logging.warning('scambling of rays, triangulation may not be working')
     
     # footprint in image plane (assuming beam of 1W)
-    density = abs(pupil_area / pupil_area_tot / image_area );  # [W/mm^2]
+    density = abs(pupil_area / pupil_area_tot / image_area / nFieldPoints);  # [W/mm^2]
     for s in np.where(~broken)[0]:
       triangle = image_points[simplices[s]];
       mask = point_in_triangle(img_pixels,triangle);
