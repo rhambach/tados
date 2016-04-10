@@ -14,9 +14,10 @@ class AdaptiveMesh(object):
   Implementation of an adaptive mesh for a given mapping f:domain->image.
   We start from a Delaunay triangulation in the domain of f. This grid
   will be distorted in the image space. We refine the mesh by subdividing
-  large or broken triangles. This process can be iterated.
+  large or broken triangles. This process can be iterated, e.g. wehn a 
+  triangle is cut multiple times (use threshold for minimal size of triangle
+  in domain space)
   
-  Note: currently, problems arise if a triangle is cut multiple times.
   ToDo: add unit tests
   """
   
@@ -155,7 +156,7 @@ class AdaptiveMesh(object):
         
      
 
-  def refine_broken_triangles(self,is_broken,nDivide=10,bPlot=False,bPlotTriangles=[7]):
+  def refine_broken_triangles(self,is_broken,nDivide=10,bPlot=False,bPlotTriangles=[0]):
     """
     subdivide triangles which contain discontinuities in the image mesh
       is_broken  ... function mask=is_broken(triangles) that accepts a list of 
@@ -165,6 +166,7 @@ class AdaptiveMesh(object):
       bPlot      ... (opt) plot sampling and selected points for debugging 
       bPlotTriangles (opt) list of triangle indices for which segmentation should be shown
 
+    returns: number of new triangles
     Note: The resulting mesh will be no longer a Delaunay mesh (identical points 
           might be present, circumference rule not guaranteed). Mesh functions, 
           that need this property (like refine_large_triangles()) will not work
@@ -172,7 +174,7 @@ class AdaptiveMesh(object):
     """
     broken = is_broken(self.simplices);
     nTriangles = np.sum(broken)
-    if nTriangles==0: return;                 # noting to do!
+    if nTriangles==0: return 0;                 # noting to do!
     nPointsOrigMesh = self.image.shape[0];  
     
     # add new simplices:
@@ -282,3 +284,6 @@ class AdaptiveMesh(object):
     # update simplices in mesh    
     self.__tri = None; # delete initial Delaunay triangulation        
     self.simplices=np.vstack((self.simplices[~broken], new_simplices)); # no longer Delaunay
+
+    # return number of new triangles
+    return new_simplices.shape[0]

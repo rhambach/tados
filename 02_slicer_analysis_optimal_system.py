@@ -55,9 +55,15 @@ def analyze_transmission(hDDE):
 
     # segmentation of triangles along cutting line
     lthresh = 0.5*image_size[1];
-    is_broken = lambda(simplices): Mesh.get_broken_triangles(simplices=simplices,lthresh=lthresh);  
-    Mesh.refine_broken_triangles(is_broken,nDivide=100,bPlot=True,bPlotTriangles=[1,2,3]);
-    if i==0: Mesh.plot_triangulation(skip_triangle=is_broken);      
+    Athresh = np.pi/1000;       # 0.1% of pupil area
+    def is_broken(simplices):
+      broken = Mesh.get_broken_triangles(simplices=simplices,lthresh=lthresh);
+      area   = Mesh.get_area_in_domain(simplices=simplices);
+      return broken & (area>Athresh)  
+    while True:  # iteratively refine broken triangles
+      nNew = Mesh.refine_broken_triangles(is_broken,nDivide=100,bPlot=True);
+      if nNew==0: break # no additional triangles added
+      if i==0: Mesh.plot_triangulation(skip_triangle=is_broken);
     pupil_points, image_points, simplices = Mesh.get_mesh();
 
     # analysis of beam intensity in each triangle (conservation of energy!) 
