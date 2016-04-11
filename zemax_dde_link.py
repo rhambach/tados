@@ -110,6 +110,42 @@ def cartesian_sampling(nx,ny,rmax=1.):
   x,y=np.meshgrid(x,y);   
   ind = x**2 + y**2 <= rmax;
   return x[ind],y[ind]
+
+def polar_sampling(Nr,rmax=1.,ind=False):
+  """
+  polar sampling with roughly equi-area sampling point distribution
+   Nr   ... number of rings, last ring has index (Nr-1)
+   rmax ... normalization radius
+   ind  ... (opt) return index arrays indicating ring boundaries and weights of each ring
+  """
+  
+  # bin edges:  0.5, 1.5, 2.5, ..., Nr-1.5, Nr-0.5
+  # bin centers:   1,   2,   3,   ...,   Nr-1
+  bins = (np.arange(Nr)+0.5)/(Nr-0.5)*rmax;  # edges of radial bins (except first ring)
+  area = np.diff(bins**2)/rmax**2;           # normalized area of each ring
+  r = np.arange(1,Nr)/(Nr-0.5)*rmax;         # bin centers
+  assert np.allclose( r, (bins[1:]+bins[0:-1])/2);               
+  # number of points per ring is calculated from approx. area in ring:
+  # area = pi(r+dr)^2 - pi(r-dr)^2 ~ pi*r*dr  := Ntet*dr^2
+  # => Ntet = pi*r/dr = pi*[1,2,3,...]
+  Ntet = np.round(np.pi*np.arange(1,Nr));
+  # construct grid points in each ring
+  x=[0]; y=[0];                              # first ring
+  for i in xrange(Nr-1):  
+    tet = np.linspace(0,2*np.pi,Ntet[i],endpoint=False);
+    tet+= i*np.pi/(1+np.sqrt(5));            # offset for each second ring
+    x.extend(r[i]*np.cos(tet));
+    y.extend(r[i]*np.sin(tet));
+  x=np.asarray(x).flatten();
+  y=np.asarray(y).flatten();
+  # handle zero'th ring
+  if ind:
+    w = np.insert(area,0,(0.5/(Nr-0.5))**2);
+    Ntet = np.insert(Ntet,0,1);
+    assert np.allclose(np.sum(w),1);
+    return x,y,Ntet,w
+  else:
+    return x,y
   
 def fibonacci_sampling(N,rmax=1.):
   """
@@ -135,3 +171,8 @@ def fibonacci_sampling_with_circular_boundary(N,Nboundary=32,rmax=1.):
   yp = rmax * np.cos(theta);
   return np.hstack((x, xp)), np.hstack((y, yp));
   
+
+if __name__ == '__main__':
+  x,y,Ntet,w = polar_sampling(50,ind=True);
+  plt.figure();
+  plt.scatter(x,y);

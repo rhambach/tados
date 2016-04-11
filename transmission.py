@@ -113,6 +113,60 @@ class RectImageDetector(Detector):
     logging.info('total intensity: %5.3f W'%(np.sum(image_intensity)*dx*dy)); 
     return fig
     
+    
+class PolarImageDetector(Detector):    
+  "2D Image Detector with polar coordinates"
+
+  def __init__(self, rmax=1, nrings=100):
+    """
+     rmax ... radial size of detector in image space
+     nrings.. number of rings
+    """
+    self.rmax = rmax;
+    self.nrings = nrings;
+    ret = polar_sampling(nrings,rmax=rmax,ind=True); 
+    self.points = np.asarray(ret[0:2]);     # shape: (2,nPixels)
+    self.points_per_ring = ret[2];          # shape: (nrings,)
+    self.weight_of_ring  = ret[3];          # shape: (nrings,)
+    self.intensity = np.zeros(self.points.shape[1]);  # 1d array
+
+  def add(self,mesh,skip=None,weight=1):
+    """
+    calculate footprint in image plane
+      mesh ... instance of AdaptiveMesh 
+      skip ... indices which simplices should be skipped
+      weight.. weight of contribution (intensity in Watt)
+    """
+    domain_area = mesh.get_area_in_domain(); 
+    domain_area /= np.sum(np.abs(domain_area));   # normalized weight in domain
+    image_area  = mesh.get_area_in_image();       # size of triangle in image
+    density = weight * abs( domain_area / image_area);
+    for s in np.where(~skip)[0]:
+      triangle = mesh.image[mesh.simplices[s]];
+      mask = point_in_triangle(self.points,triangle);
+      self.intensity += density[s]*mask;
+
+  def show(self):
+    " plotting 2D footprint in image plane, returns figure handle"
+    x,y=self.points;    
+    fig,(ax1,ax2)= plt.subplots(2);
+    ax1.set_title("footprint in image plane");
+    ax1.tripcolor(x,y,self.intensity);
+
+    ax2.set_title("radial profile");    
+    Nr=np.insert(np.cumsum(self.points_per_ring),0,0); # index array for rings, size (nrings+1,)
+    radial_profile = np.empty(self.nrings);
+    r = np.empty(self.nrings);
+    for i in xrange(self.nrings):
+      radial_profile[i] = np.sum(self.intensity[Nr[i]:Nr[i+1]]) / self.points_per_ring[i];
+      r2 = np.sum(self.points[:,Nr[i]:Nr[i+1]]**2,axis=0)
+      assert np.allclose(r2[0],r2);
+      r[i] = np.sqrt(r2[0]);
+     
+    ax2.plot(r,radial_profile);
+    #logging.info('total intensity: %5.3f W'%(np.sum(image_intensity)*dx*dy)); 
+    return fig
+    
       
 
 class Transmission(object):
@@ -159,10 +213,10 @@ class Transmission(object):
       # iterative mesh refinement (subdivision of broken triangles)
       while True:  
         nNew = Mesh.refine_broken_triangles(is_broken,nDivide=100,bPlot=(ip==0));
-        if nNew==0: break # converged, no additional subdivisions occured
         if ip==0: 
           skip = lambda(simplices): Mesh.get_broken_triangles(simplices=simplices,lthresh=lthresh)        
           Mesh.plot_triangulation(skip_triangle=skip);
+        if nNew==0: break # converged, no additional subdivisions occured
           
       # update detectors
       broken = Mesh.get_broken_triangles(lthresh=lthresh);
@@ -221,13 +275,16 @@ def __test_angular_distribution(hDDE):
     return ret[:,[3,4]]+image_size*vigcode;# return (kx,ky) direction cosine in image space
 
   # field sampling (octagonal fiber, adaptive mesh)
-  xx,yy=cartesian_sampling(21,21,rmax=2);  # low: 11x11, high: 7x7
+  # sampling can be calculated by rational approx. of tan(pi/8) = [0,2,2,2,2,....] in fraction
+  # approx tan(pi/2) ~ 1/2, 2/5, 5/12, 12/29, 29/70, 70/169
+  # results in samplings: (alwoys denominator-1): 4,11,28,69,168
+  xx,yy=cartesian_sampling(28,28,rmax=2);  # low: 11x11, high: 69x69
   ind = (np.abs(xx)<=1) & (np.abs(yy)<=1) & \
               (np.abs(xx+yy)<=np.sqrt(2)) & (np.abs(xx-yy)<=np.sqrt(2));
   field_sampling = np.vstack((xx[ind],yy[ind])).T;       # size (nFieldPoints,2)
   
   # pupil sampling (cartesian grid with circular boundary)
-  px,py=cartesian_sampling(7,7,rmax=1)     # low: 7x7, high: 11x11
+  px,py=cartesian_sampling(7,7,rmax=.1)     # low: 7x7, high: 11x11
   pupil_sampling = np.vstack((px,py)).T;                 # size (nPoints,2)
   plt.figure(); plt.title("pupil sampling (normalized coordinates)");
   plt.plot(px.flat,py.flat,'.')
@@ -235,8 +292,8 @@ def __test_angular_distribution(hDDE):
   
   # set up image detector (in angular space)
   image_size=(0.5,0.5);  # NA_max
-  img = RectImageDetector(extent=image_size,pixels=(201,201));
-  dbg = CheckTriangulationDetector();
+  img = PolarImageDetector(rmax=0.2,nrings=50);
+  dbg = CheckTriangulationDetector(ref_area=8*np.tan(np.pi/8)); # area of octagon with inner radius 1
   
   # run Transmission calculation
   T = Transmission(pupil_sampling,field_sampling,raytrace,[dbg,img]);
