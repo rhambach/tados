@@ -153,7 +153,7 @@ class ToleranceSystem(object):
     
   def reset(self):
     " reset system to original state"
-    hDDE.load(self.filename);
+    self.hDDE.load(self.filename);
     self.ln.zPushLens(1);
 
     self.numSurf = self.ln.zGetNumSurf();

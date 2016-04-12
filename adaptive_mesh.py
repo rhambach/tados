@@ -16,7 +16,8 @@ class AdaptiveMesh(object):
   will be distorted in the image space. We refine the mesh by subdividing
   large or broken triangles. This process can be iterated, e.g. wehn a 
   triangle is cut multiple times (use threshold for minimal size of triangle
-  in domain space)
+  in domain space). Points outside of the domain (e.g. raytrace fails) 
+  should be mapped to image point (np.nan,np.nan) and are handled separately.
   
   ToDo: add unit tests
   """
@@ -109,7 +110,7 @@ class AdaptiveMesh(object):
   
   def get_broken_triangles(self,simplices=None,lthresh=None):
     """
-    try to identify triangles that are cut or vignetted in image space
+    identify triangles that are cut in image space or include invalid vertices
       simplices ... (opt) list of simplices, shape (nTriangles,3)  
       lthresh   ... (opt) threshold for longest side of broken triangle 
     Returns:
@@ -121,10 +122,12 @@ class AdaptiveMesh(object):
     # calculate maximum of (squared) length of two sides of each triangle 
     # (X[0]-X[1])**2 + (Y[0]-Y[1])**2; (X[1]-X[2])**2 + (Y[1]-Y[2])**2 
     max_lensq = np.max(np.sum(np.diff(triangles,axis=1)**2,axis=2),axis=1);
-    # mark triangle as broken, if max side is 3 times larger than median value
+    # default: mark triangle as broken, if max side is 3 times larger than median value
     if lthresh is None: lthresh = 3*np.sqrt(np.median(max_lensq));
-    return max_lensq > lthresh**2;
- 
+    # valid triangles: all sides smaller than lthresh, none of its vertices invalid (np.nan)
+    bValid = max_lensq < lthresh**2; 
+    return ~bValid;   # Note: differs from (max_lensq >= lthresh**2), if some vertices are invalid!
+
         
   def refine_large_triangles(self,is_large):
     """
@@ -132,7 +135,8 @@ class AdaptiveMesh(object):
       is_large ... function mask=is_large(triangles) that accepts a list of 
                      simplices of shape (nTriangles, 3) and returns a flag 
                      for each triangle indicating if it should be subdivided
-                     
+    
+    returns: number of new triangles                 
     Note: Additional points are added at the center of gravity of large triangles
           and the Delaunay triangulation is recalculated. Edge flips can occur.
     """
@@ -144,7 +148,10 @@ class AdaptiveMesh(object):
     if np.sum(ind)==0: return; # nothing to do
     
     # add center of gravity for critical triangles
-    new_domain_points = np.sum(self.domain[self.simplices[ind]],axis=1)/3;
+    new_domain_points = np.sum(self.domain[self.simplices[ind]],axis=1)/3; # shape (nTriangles,2)
+    # remove invalid points (coordinates are nan)    
+    new_domain_points = new_domain_points[~np.any(np.isnan(new_domain_points),axis=1)]
+    # update triangulation    
     self.__tri.add_points(new_domain_points);
     logging.info("refining_large_triangles(): adding %d points"%(new_domain_points.shape[0]))
     
@@ -153,12 +160,13 @@ class AdaptiveMesh(object):
     self.image = np.vstack((self.image,new_image_points));
     self.domain= np.vstack((self.domain,new_domain_points));
     self.simplices = self.__tri.simplices;
-        
-     
+    
+    return new_domain_points.shape[0];
+
 
   def refine_broken_triangles(self,is_broken,nDivide=10,bPlot=False,bPlotTriangles=[0]):
     """
-    subdivide triangles which contain discontinuities in the image mesh
+    subdivide triangles which contain discontinuities in the image mesh or invalid vertices
       is_broken  ... function mask=is_broken(triangles) that accepts a list of 
                       simplices of shape (nTriangles, 3) and returns a flag 
                       for each triangle indicating if it should be subdivided
@@ -172,7 +180,21 @@ class AdaptiveMesh(object):
           that need this property (like refine_large_triangles()) will not work
           after calling this function.
     """
-    broken = is_broken(self.simplices);
+    broken = is_broken(self.simplices);                    # shape (nSimplices)
+    simplices = self.simplices[broken];                    # shape (nTriangles,3)
+    triangles = self.image[simplices];                     # shape (nTriangles,3,2)
+    
+    # check if any of the triangles has an invalid vertex (x or y coordinate is np.nan)
+    bInvalidVertex = np.any(np.isnan(triangles),axis=2);   # shape (nTriangles,3)
+    if np.sum(bInvalidVertex)>0:
+      # exclude triangles that have only invalid vertices      
+      keep = ~np.all(bInvalidVertex,axis=1);               # shape (nTriangles,)
+      broken[broken] = keep;                               # shape (nSimplices,)
+      simplices=simplices[keep];
+      triangles=triangles[keep];
+      
+
+    # check if subdivision is needed at all    
     nTriangles = np.sum(broken)
     if nTriangles==0: return 0;                 # noting to do!
     nPointsOrigMesh = self.image.shape[0];  
@@ -197,8 +219,6 @@ class AdaptiveMesh(object):
     #       of the triangle, otherwise the partition will fail!     
 
     # identify the shortest edge of the triangle in image space (not cut)
-    simplices = self.simplices[broken];                    # shape (nTriangles,3)
-    triangles = self.image[simplices];                     # shape (nTriangles,3,2)
     vertices = np.concatenate((triangles,triangles[:,[0],:]),axis=1); # shape (nTriangles,4,2)
     edge_len = np.sum( np.diff(vertices,axis=1)**2, axis=2); # shape (nTriangles,3)
     min_edge = np.argmin( edge_len,axis=1);                # shape (nTriangles)
@@ -287,3 +307,183 @@ class AdaptiveMesh(object):
 
     # return number of new triangles
     return new_simplices.shape[0]
+    
+    
+    
+  def refine_invalid_triangles(self,nDivide=10,bPlot=False,bPlotTriangles=[0]):
+    """
+    subdivide triangles which have one or two invalid vertices (x or y coordinate are np.nan)
+      nDivide    ... (opt) number of subdivisions of each side of triangle
+      bPlot      ... (opt) plot sampling and selected points for debugging 
+      bPlotTriangles (opt) list of triangle indices for which segmentation should be shown
+
+    returns: number of new triangles
+    Note: The resulting mesh will be no longer a Delaunay mesh (identical points 
+          might be present, circumference rule not guaranteed). Mesh functions, 
+          that need this property (like refine_large_triangles()) will not work
+          after calling this function.
+    """
+    vertices = self.image[self.simplices];                 # shape (nSimplices,3,2)    
+    bInvalidVertex = np.any(np.isnan(vertices),axis=2);    # shape (nSimplices,3)   
+    if ~np.any(bInvalidVertex): return 0;                  # nothing to do
+    
+    # we only consider two cases: one vertex is invalid (generate two new triangles)
+    #  or two vertices are invalid (generate one new triangle)
+    #  all other triangles are unchanged
+    nInvalidVertices = np.sum(bInvalidVertex,axis=1);      # shape (nSimplices)
+    ind_case1 = nInvalidVertices==1;
+    ind_case2 = nInvalidVertices==2;
+    
+    new_simplices=[];    
+    if np.any(ind_case1):
+      new_simplices.extend(self.__subdivide_triangles_with_one_invalid_vertex(ind_case1,nDivide));
+    if np.any(ind_case2):
+      new_simplices.extend(self.__subdivide_triangles_with_two_invalid_vertices(ind_case2,nDivide));
+    new_simplices=np.reshape(new_simplices,(-1,3));    
+    
+    # update list of simplices
+    bReplace=np.logical_or(ind_case1,ind_case1);
+    self.__add_new_simplices(new_simplices,bReplace);
+    
+    return new_simplices.shape[0];
+    
+  def __subdivide_triangles_with_one_invalid_vertex(self,bInvalid,nDivide=10):
+    """
+    case 1: one point is invalid (chosen as point C)
+    adds new points p1 and p2 to mesh and returns new simplices
+                 C
+                 x
+                x x              x invalid points 
+               x   x             o new triangle vertices (first valid from C)
+              x     x
+          p1 o       o p2
+            /         \          new triangles:
+           /___________\           (p1,A,p2),(A,B,p2)
+          A              B 
+    """
+    simplices = self.simplices[bInvalid];                  # shape (nTriangles,3)
+    triangles = self.image[simplices];                     # shape (nTriangles,3,2)
+    nTriangles= triangles.shape[0];
+    nPointsOrigMesh = self.image.shape[0];  
+    
+    # find invalid point as C (index on first axis) and resample CA and CB
+    indC = np.where(np.any(np.isnan(triangles),axis=-1))[1];
+    A,B,C,domain_points,image_points = self.__resample_edges_of_triangle(simplices,indC,nDivide);
+                                                           # shape (nDivide,2,nTriangles,2)
+    assert(np.all(np.any(np.isnan(self.image[C]),axis=-1)));  # all points C should be invalid
+
+    # iterate over all triangles and subdivide them
+    new_domain_points=[];
+    new_image_points=[];
+    new_simplices=[];
+    for k in xrange(nTriangles):    
+      # find index of first valid point p1 on CA and p2 on CB
+      ind = np.any(np.isnan(image_points[:,:,k]),axis=-1);  # shape (nDivide,2)
+      p1=np.where(~ind[:,0])[0][0];                   # first valid point on CA
+      p2=np.where(~ind[:,1])[0][0];                   # first valid ponit on CB
+      new_domain_points.extend((domain_points[p1,0,k,:], domain_points[p2,1,k,:]));
+      new_image_points.extend( ( image_points[p1,0,k,:],  image_points[p2,1,k,:]));
+      # calculate index for points p1 and p2 in self.domain = [self.domain, new_domain_points]
+      P1 = nPointsOrigMesh+2*k; P2=P1+1;
+      new_simplices.extend(((P1,A[k],P2), (A[k],B[k],P2)));
+
+    # update points in mesh (points are no longer unique!)
+    logging.info("refine_invalid_triangles(case1): adding %d points"%(2*nTriangles));
+    self.image = np.vstack((self.image,np.reshape(new_image_points,(2*nTriangles,2)))); 
+    self.domain= np.vstack((self.domain,np.reshape(new_domain_points,(2*nTriangles,2))));  
+
+    return np.reshape(new_simplices,(2*nTriangles,3));
+    
+
+  def __subdivide_triangles_with_two_invalid_vertices(self,bInvalid,nDivide=10):
+    """
+    case 2: two points are invalid (chosen as points A and B)
+                 C
+                 /\
+                /  \              x invalid points 
+               /    \             o new triangle vertices (last valid from C)
+              /      \
+          p1 o        o p2
+            x          x          new triangle:
+           xxxxxxxxxxxxxx           (p1,p2,C)
+          A              B 
+    """
+    simplices = self.simplices[bInvalid];                  # shape (nTriangles,3)
+    triangles = self.image[simplices];                     # shape (nTriangles,3,2)
+    nTriangles= triangles.shape[0];
+    nPointsOrigMesh = self.image.shape[0];  
+
+    # find valid point as C (index on first axis) and resample CA and CB
+    indC = np.where(~np.any(np.isnan(triangles),axis=-1))[1];
+    A,B,C,domain_points,image_points = self.__resample_edges_of_triangle(simplices,indC,nDivide);
+                                                           # shape (nDivide,2,nTriangles,2)
+    assert(np.all(np.any(np.isnan(self.image[A]),axis=-1)));  # all points A should be invalid
+    assert(np.all(np.any(np.isnan(self.image[B]),axis=-1)));  # all points B should be invalid
+    
+    # iterate over all triangles and subdivide them
+    new_domain_points=[];
+    new_image_points=[];
+    new_simplices=[];
+    for k in xrange(nTriangles):    
+      # find index of first valid point p1 on CA and p2 on CB
+      ind = np.any(np.isnan(image_points[:,:,k]),axis=-1);  # shape (nDivide,2)
+      p1=np.where(~ind[:,0])[0][-1];                   # last valid point on CA
+      p2=np.where(~ind[:,1])[0][-1];                   # last valid ponit on CB
+      new_domain_points.extend((domain_points[p1,0,k,:], domain_points[p2,1,k,:]));
+      new_image_points.extend( ( image_points[p1,0,k,:],  image_points[p2,1,k,:]));
+      # calculate index for points p1 and p2 in self.domain = [self.domain, new_domain_points]
+      P1 = nPointsOrigMesh+2*k; P2=P1+1;
+      new_simplices.append((P1,P2,C[k]));
+ 
+    # update points in mesh (points are no longer unique!)
+    logging.info("refine_invalid_triangles(case2): adding %d points"%(2*nTriangles));
+    self.image = np.vstack((self.image,np.reshape(new_image_points,(2*nTriangles,2)))); 
+    self.domain= np.vstack((self.domain,np.reshape(new_domain_points,(2*nTriangles,2))));  
+
+    return np.reshape(new_simplices,(nTriangles,3));
+        
+
+
+  def __resample_edges_of_triangle(self,simplices,indC,nDivide=10):
+    """
+    generate dense sampling on edges CA and CB on given simplices:
+      simplices ... vertex indices of triangles to resample, shape (nTriangles,3)
+      indC      ... vertex number (mod 3) that should be used as point C, shape (nTriangles)
+      nDivide   ... number of sampling points on CA and CB
+    returns: 
+      A,B,C     ... indices of points A,B,C, shape (nTriangles,)
+      domain_points(iPoint,iSide,iTriangle,xy) ... sampling points along CA,CB in domain
+      image_points(iPoint,iSide,iTriangle,xy)  ... sampling points along CA,CB in image
+    """    
+    # get indices of points ABC as shown above (C is isolated point)
+    nTriangles = simplices.shape[0];    
+    ind_triangle = np.arange(nTriangles)
+    C = simplices[ind_triangle,(indC)%3];
+    A = simplices[ind_triangle,(indC+1)%3];
+    B = simplices[ind_triangle,(indC-1)%3];
+    # create dense sampling along C->B and C->A in domain space
+    x = np.linspace(0,1,nDivide,endpoint=True);
+    CA = np.outer(1-x,self.domain[C]) + np.outer(x,self.domain[A]);
+    CB = np.outer(1-x,self.domain[C]) + np.outer(x,self.domain[B]);
+    # map sampling on CA and CB to image space 
+    domain_points= np.hstack((CA,CB)).reshape(nDivide,2,nTriangles,2);
+    image_points = self.mapping(domain_points.reshape(-1,2)).reshape(nDivide,2,nTriangles,2);
+    return A,B,C,domain_points,image_points;       
+
+
+  def  __add_new_simplices(self,new_simplices,bReplace):
+    """
+      add list of new simplices to Mesh and Replace old simplices indicated by boolean array
+      perform sanity checks beforehand
+        new_simplices ... shape(nTriangles,3)
+        bReplace      ... shape(self.simplices.shape[0])
+      returns: number of added triangles
+    """
+    # remove degenerated triangles (p1,p2 identical to A or B) 
+    area = self.get_area_in_domain(new_simplices);
+    new_simplices = new_simplices[area<>0];             # remove degenerate triangles
+    assert(np.all(area>0));                             # by construction all triangles are ccw
+    # update simplices in mesh    
+    self.__tri = None; # delete initial Delaunay triangulation        
+    self.simplices=np.vstack((self.simplices[~bReplace], new_simplices)); # no longer Delaunay
+    return new_simplices.shape[0];

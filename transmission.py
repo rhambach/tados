@@ -282,6 +282,9 @@ class Transmission(object):
       mapping = lambda(mesh_points): self.raytrace(p,mesh_points);
       Mesh=AdaptiveMesh(self.mesh_points, mapping);  
       
+      # subdivision of invalid triangles (raytrace failed for some vertices)
+      Mesh.refine_invalid_triangles(nDivide=100,bPlot=(ip==0));
+      
       # iterative mesh refinement (subdivision of broken triangles)
       while True:  
         if ip==0: # plot mesh for first set of parameters
