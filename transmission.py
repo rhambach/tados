@@ -8,6 +8,8 @@ Transmission: perform the transmission calculation (iterate over discrete set of
   (e.g. pupil coordinates) using a given raytrace function
 Detectors: analyze the raytrace results
 
+ToDo: add unit tests
+
 @author: Hambach
 """
 
@@ -152,7 +154,7 @@ class PolarImageDetector(Detector):
     fig,(ax1,ax2)= plt.subplots(2);
     ax1.set_title("footprint in image plane");
     ax1.tripcolor(x,y,self.intensity);
-
+    # radial profile
     ax2.set_title("radial profile");    
     Nr=np.insert(np.cumsum(self.points_per_ring),0,0); # index array for rings, size (nrings+1,)
     radial_profile = np.empty(self.nrings);
@@ -162,10 +164,16 @@ class PolarImageDetector(Detector):
       r2 = np.sum(self.points[:,Nr[i]:Nr[i+1]]**2,axis=0)
       assert np.allclose(r2[0],r2);
       r[i] = np.sqrt(r2[0]);
-     
-    ax2.plot(r,radial_profile);
-    #logging.info('total intensity: %5.3f W'%(np.sum(image_intensity)*dx*dy)); 
+    ax2.plot(r,radial_profile,label='radial profile');
+    
+    # encircled energy (area of ring = weight of ring x total area of detector)
+    encircled_energy = np.cumsum(radial_profile*self.weight_of_ring*np.pi*self.rmax**2);
+    ax2.plot(r,encircled_energy,label='encircled energy');
+    ax2.legend(loc=0)
+    logging.info('total intensity: %5.3f W'%(encircled_energy[-1])); 
     return fig
+    
+    
     
       
 
@@ -212,11 +220,12 @@ class Transmission(object):
       
       # iterative mesh refinement (subdivision of broken triangles)
       while True:  
-        nNew = Mesh.refine_broken_triangles(is_broken,nDivide=100,bPlot=(ip==0));
-        if ip==0: 
+        if ip==0: # plot mesh for first set of parameters
           skip = lambda(simplices): Mesh.get_broken_triangles(simplices=simplices,lthresh=lthresh)        
           Mesh.plot_triangulation(skip_triangle=skip);
-        if nNew==0: break # converged, no additional subdivisions occured
+        # refine mesh until nothing changes
+        nNew = Mesh.refine_broken_triangles(is_broken,nDivide=100,bPlot=(ip==0));        
+        if nNew==0: break 
           
       # update detectors
       broken = Mesh.get_broken_triangles(lthresh=lthresh);
@@ -237,7 +246,7 @@ def __test_intensity_footprint(hDDE):
     return ret[:,[0,1]]+image_size*vigcode;# return (x,y) coordinates in image space
 
   # field sampling (octagonal fiber)
-  xx,yy=cartesian_sampling(7,7,rmax=2);   # low: 7x7, high: 11x11
+  xx,yy=cartesian_sampling(3,3,rmax=2);   # low: 7x7, high: 11x11
   ind = (np.abs(xx)<=1) & (np.abs(yy)<=1) & \
               (np.abs(xx+yy)<=np.sqrt(2)) & (np.abs(xx-yy)<=np.sqrt(2));
   field_sampling = np.vstack((xx[ind],yy[ind])).T;       # size (nFieldPoints,2)
@@ -275,8 +284,8 @@ def __test_angular_distribution(hDDE):
     return ret[:,[3,4]]+image_size*vigcode;# return (kx,ky) direction cosine in image space
 
   # field sampling (octagonal fiber, adaptive mesh)
-  # sampling can be calculated by rational approx. of tan(pi/8) = [0,2,2,2,2,....] in fraction
-  # approx tan(pi/2) ~ 1/2, 2/5, 5/12, 12/29, 29/70, 70/169
+  # sampling should be rational approx. of tan(pi/8), using continued fractions:
+  # approx tan(pi/2) = [0;2,2,2,2,....] ~ 1/2, 2/5, 5/12, 12/29, 29/70, 70/169
   # results in samplings: (alwoys denominator-1): 4,11,28,69,168
   xx,yy=cartesian_sampling(28,28,rmax=2);  # low: 11x11, high: 69x69
   ind = (np.abs(xx)<=1) & (np.abs(yy)<=1) & \
@@ -284,7 +293,7 @@ def __test_angular_distribution(hDDE):
   field_sampling = np.vstack((xx[ind],yy[ind])).T;       # size (nFieldPoints,2)
   
   # pupil sampling (cartesian grid with circular boundary)
-  px,py=cartesian_sampling(7,7,rmax=.1)     # low: 7x7, high: 11x11
+  px,py=cartesian_sampling(3,3,rmax=1)     # low: 7x7, high: 11x11
   pupil_sampling = np.vstack((px,py)).T;                 # size (nPoints,2)
   plt.figure(); plt.title("pupil sampling (normalized coordinates)");
   plt.plot(px.flat,py.flat,'.')
@@ -292,7 +301,7 @@ def __test_angular_distribution(hDDE):
   
   # set up image detector (in angular space)
   image_size=(0.5,0.5);  # NA_max
-  img = PolarImageDetector(rmax=0.2,nrings=50);
+  img = PolarImageDetector(rmax=0.3,nrings=100);
   dbg = CheckTriangulationDetector(ref_area=8*np.tan(np.pi/8)); # area of octagon with inner radius 1
   
   # run Transmission calculation
@@ -317,6 +326,6 @@ if __name__ == '__main__':
     #                        'Cooke 40 degree field.zmx')
     filename= os.path.realpath('./tests/pupil_slicer.ZMX');
     hDDE.load(filename);
-    #__test_intensity_footprint(hDDE);
+    __test_intensity_footprint(hDDE);
     __test_angular_distribution(hDDE);
     
