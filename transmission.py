@@ -72,12 +72,17 @@ class RectImageDetector(Detector):
     """
      extent ... size of detector in image space (xwidth, ywidth)
      pixels ... number of pixels in x and y (xnum,ynum)
+     
+     Note, 'ij' indexing is used,  i.e,. self.points[:,ix,iy]=(x,y)
     """
     self.extent = np.asarray(extent);
     self.pixels = np.asarray(pixels);
-    self.points = cartesian_sampling(*pixels,rmax=2); # shape: (2,nPixels)
-    self.points *= self.extent[:,np.newaxis]/2;
-    self.intensity = np.zeros(np.prod(self.pixels));  # 1d array
+    # cartesian sampling 
+    xmax,ymax = self.extent/2.; nx,ny = self.pixels;    
+    x = np.linspace(-xmax,xmax,nx);  
+    y = np.linspace(-ymax,ymax,ny);
+    self.points = np.asarray(np.meshgrid(x,y,indexing='ij')); # shape: (2,numx,numy)
+    self.intensity = np.zeros(self.pixels);                   # shape: (numx,numy)
 
   def add(self,mesh,skip=None,weight=1):
     """
@@ -108,12 +113,12 @@ class RectImageDetector(Detector):
     # footprint    
     fig,(ax1,ax2)= plt.subplots(2);
     ax1.set_title("footprint in image plane");
-    ax1.imshow(intensity,origin='lower',aspect='auto',interpolation='hanning',
+    ax1.imshow(intensity.T,origin='lower',aspect='auto',interpolation='hanning',
              extent=[x[0],x[-1],y[0],y[-1]]);
     # projections    
     ax2.set_title("projected intensity in image plane");    
-    ax2.plot(x,xprofile,label="along y");
-    ax2.plot(y,yprofile,label="along x");
+    ax2.plot(x,xprofile,label="along x");
+    ax2.plot(y,yprofile,label="along y");
     ax2.legend(loc=0)
     # total intensity
     dx = x[1]-x[0]; dy = y[1]-y[0];
@@ -133,8 +138,8 @@ class RectImageDetector(Detector):
       intensity... 2d intensity from detector,  shape (xnum,ynum)
     """
     Nx,Ny = self.pixels;
-    X,Y   = self.points.reshape(2,Ny,Nx);
-    image_intensity = self.intensity.reshape(Ny,Nx).copy();
+    X,Y   = self.points.reshape(2,Nx,Ny);
+    image_intensity = self.intensity.reshape(Nx,Ny).copy();
     if fMask is not None:
       image_intensity[fMask(X,Y)] = 0
     return X,Y,image_intensity
@@ -147,7 +152,7 @@ class RectImageDetector(Detector):
     Return: x, xprofile, shape: (xnum,)
     """
     X,Y,intensity = self.get_footprint(fMask);
-    xaxis = Y[:,0];  yaxis = X[0,:];  dy = yaxis[1]-yaxis[0]; 
+    xaxis = X[:,0];  yaxis = Y[0,:];  dy = yaxis[1]-yaxis[0]; 
     xprofile = np.sum(intensity,axis=1)*dy; # integral over y
     return xaxis,xprofile;
     
@@ -159,7 +164,7 @@ class RectImageDetector(Detector):
     Return: y, yprofile, shape: (ynum,)
     """
     X,Y,intensity = self.get_footprint(fMask);
-    xaxis = Y[:,0];  yaxis = X[0,:];  dx = xaxis[1]-xaxis[0]; 
+    xaxis = X[:,0];  yaxis = Y[0,:];  dx = xaxis[1]-xaxis[0]; 
     yprofile = np.sum(intensity,axis=0)*dx; # integral over x  
     return yaxis,yprofile;
     

@@ -14,7 +14,7 @@ from zemax_dde_link import *
 def __test_intensity_footprint(hDDE):  
   
   # raytrace parameters
-  image_surface = 22;
+  image_surface = 24;
   wavenum  = 4;
   def raytrace(params, pupil_points):      # local function for raytrace
     x,y   = params;      
@@ -50,7 +50,7 @@ def __test_intensity_footprint(hDDE):
   img.show();
 
   # analyze img detector in detail (left and right sight separately)
-  img.show(fMask = lambda x,y: np.logical_or(2*x+y<0, x>0.018))  
+  img.show(fMask = lambda x,y: np.logical_or(2*x+y<0, x>0.07))  
   img.show(fMask = lambda x,y: 2*x+y>=0)
   
 
