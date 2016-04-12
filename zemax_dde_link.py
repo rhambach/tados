@@ -57,13 +57,16 @@ class DDElinkHandler(object):
 
     Returns
       results... numpy array with ... columns containing
-       results[0:3]: x,y,z coordinates of ray on requested surface
-       results[3:6]: l,m,n direction cosines after requested surface
-       results[7]:   error value
+       results[0]:   error value
                       0 = ray traced successfully;
                       +ve number = the ray missed the surface;
                       -ve number = the ray total internal reflected (TIR) at surface
                                    given by the absolute value of the ``error``
+       results[1]:   vigcode
+                      The first surface where the ray was vignetted. Raytrace is continued.       
+       results[2:5]: x,y,z coordinates of ray on requested surface
+       results[5:8]: l,m,n direction cosines after requested surface
+       
     """
     # enlarge all vector arguments to same size    
     nRays = max(map(np.size,(x,y,px,py,waveNum)));
@@ -92,7 +95,7 @@ class DDElinkHandler(object):
     #print("zArrayTrace: %ds"%(time.time()-t))
 #
     # collect results
-    results = np.asarray( [(r.x,r.y,r.z,r.l,r.m,r.n,r.vigcode,r.error) for r in rays[1:]] );
+    results = np.asarray( [(r.error,r.vigcode,r.x,r.y,r.z,r.l,r.m,r.n) for r in rays[1:]] );
     #print("retrive data: %ds"%(time.time()-t))    
     return results;
 

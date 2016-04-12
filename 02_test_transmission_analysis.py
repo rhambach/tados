@@ -19,9 +19,15 @@ def __test_intensity_footprint(hDDE):
   def raytrace(params, pupil_points):      # local function for raytrace
     x,y   = params;      
     px,py = pupil_points.T;                # shape (nPoints,)
-    ret = hDDE.trace_rays(x,y,px,py,wavenum,surf=image_surface);
-    vigcode = ret[:,[6]]<>0;               # include vignetting by shifting ray outside image
-    return ret[:,[0,1]]+image_size*vigcode;# return (x,y) coordinates in image space
+    ret   = hDDE.trace_rays(x,y,px,py,wavenum,surf=image_surface);
+    error = ret[:,0];
+    vigcode= ret[:,[1]];     
+    xy    = ret[:,[2,3]];    
+    # return (x,y) coordinates in image space    
+    xy   += image_size*(vigcode<>0);       # include vignetting by shifting ray outside image
+    xy[error<>0]=np.nan;                   # rays that could not be traced
+    return xy;                             
+
 
   # field sampling (octagonal fiber)
   xx,yy=cartesian_sampling(3,3,rmax=2);   # low: 7x7, high: 11x11
@@ -59,11 +65,14 @@ def __test_angular_distribution(hDDE):
   image_surface = 22;
   wavenum  = 4;
   def raytrace(params, field_points):      # local function for raytrace
-    px,py= params;      
-    x,y = field_points.T;                  # shape (nPoints,)
-    ret = hDDE.trace_rays(x,y,px,py,wavenum,surf=image_surface);
-    vigcode = ret[:,[6]]<>0;               # include vignetting by shifting ray outside image
-    return ret[:,[3,4]]+image_size*vigcode;# return (kx,ky) direction cosine in image space
+    px,py = params;      
+    x,y   = field_points.T;                # shape (nPoints,)
+    ret   = hDDE.trace_rays(x,y,px,py,wavenum,surf=image_surface);
+    error = ret[:,0];
+    vigcode=ret[:,[1]];     
+    kxky  = ret[:,[5,6]];                  # return (kx,ky) direction cosine in image space    
+    kxky[error<>0]=np.nan;                 # rays that could not be traced
+    return kxky;                             
 
   # field sampling (octagonal fiber, adaptive mesh)
   # sampling should be rational approx. of tan(pi/8), using continued fractions:
@@ -82,13 +91,13 @@ def __test_angular_distribution(hDDE):
   plt.xlabel('x'); plt.ylabel('y');
   
   # set up image detector (in angular space)
-  image_size=(0.5,0.5);  # NA_max
-  img = PolarImageDetector(rmax=0.3,nrings=100);
+  NAmax = 0.3;
+  img = PolarImageDetector(rmax=NAmax,nrings=100);
   dbg = CheckTriangulationDetector(ref_area=8*np.tan(np.pi/8)); # area of octagon with inner radius 1
   
   # run Transmission calculation
   T = Transmission(pupil_sampling,field_sampling,raytrace,[dbg,img]);
-  lthresh = 0.5*image_size[1];  
+  lthresh = 0.5*NAmax;  
   T.total_transmission(lthresh)
   
   # plotting

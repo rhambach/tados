@@ -36,8 +36,8 @@ def analyze_transmission(hDDE):
     def raytrace(pupil_points):        # local function for raytrace
       px,py = pupil_points.T;
       ret = hDDE.trace_rays(x,y,px,py,wavenum,surf=image_surface);
-      vigcode = ret[:,[6]]<>0;        # include vignetting by shifting ray outside image
-      return ret[:,[0,1]]+image_size*vigcode;
+      vigcode = ret[:,[1]]<>0;        # include vignetting by shifting ray outside image
+      return ret[:,[2,3]]+image_size*vigcode;
     Mesh=AdaptiveMesh(initial_sampling, raytrace);
 
     # mesh refinement  
