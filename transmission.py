@@ -97,24 +97,58 @@ class RectImageDetector(Detector):
 
   def show(self):
     " plotting 2D footprint in image plane, returns figure handle"
+    fig,(ax1,ax2)= plt.subplots(2);
+    # footprint    
+    x,y,intensity = self.get_footprint(); 
+    ax1.set_title("footprint in image plane");
+    ax1.imshow(intensity,origin='lower',aspect='auto',interpolation='hanning',
+             extent=[x[0],x[-1],y[0],y[-1]]);
+    # projections    
+    ax2.set_title("projected intensity in image plane");    
+    x,xprofile = self.x_projection();
+    y,yprofile = self.y_projection();    
+    ax2.plot(x,xprofile,label="along y");
+    ax2.plot(y,yprofile,label="along x");
+    ax2.legend(loc=0)
+    # total intensity
+    dx = x[1]-x[0]; dy = y[1]-y[0];
+    assert(np.allclose(np.sum(intensity)*dx*dy, 
+                       [np.sum(xprofile)*dx,np.sum(yprofile)*dy])); # total power must be the same
+    logging.info('total power: %5.3f W'%(np.sum(intensity)*dx*dy)); 
+    return fig
+    
+  def get_footprint(self):
+    """
+    returns x,y,intensity:
+      x,y      ... axes of the detector, shape (xnum,), (ynum,)
+      intensity... 2d intensity from detector, shape (xnum,ynum)
+    """
     Nx,Ny = self.pixels;
     img_pixels_2d = self.points.reshape(2,Ny,Nx);
     image_intensity = self.intensity.reshape(Ny,Nx);
-    xaxis = img_pixels_2d[1,:,0]; dx=xaxis[1]-xaxis[0];
-    yaxis = img_pixels_2d[0,0,:]; dy=yaxis[1]-yaxis[0];
-  
-    fig,(ax1,ax2)= plt.subplots(2);
-    ax1.set_title("footprint in image plane");
-    ax1.imshow(image_intensity,origin='lower',aspect='auto',interpolation='hanning',
-             extent=[xaxis[0],xaxis[-1],yaxis[0],yaxis[-1]]);
-    ax2.set_title("integrated intensity in image plane");    
-    ax2.plot(xaxis,np.sum(image_intensity,axis=1)*dy,label="along y");
-    ax2.plot(yaxis,np.sum(image_intensity,axis=0)*dx,label="along x");
-    ax2.legend(loc=0)
-  
-    logging.info('total intensity: %5.3f W'%(np.sum(image_intensity)*dx*dy)); 
-    return fig
+    xaxis = img_pixels_2d[1,:,0]; 
+    yaxis = img_pixels_2d[0,0,:];
+    return xaxis,yaxis,image_intensity
     
+  def x_projection(self):
+    """
+    Calculate projection on x-axis.
+    Return: x, xprofile, shape: (xnum,)
+    """
+    x,y,intensity = self.get_footprint();
+    dy = y[1]-y[0]; 
+    xprofile = np.sum(intensity,axis=1)*dy; # integral over y
+    return x,xprofile;
+    
+  def y_projection(self):
+    """
+    Calculate projection on y-axis.
+    Return: y, yprofile, shape: (ynum,)
+    """
+    x,y,intensity = self.get_footprint();
+    dx = x[1]-x[0]; 
+    yprofile = np.sum(intensity,axis=0)*dx; # integral over y  
+    return y,yprofile;
     
 class PolarImageDetector(Detector):    
   "2D Image Detector with polar coordinates"
@@ -150,13 +184,26 @@ class PolarImageDetector(Detector):
 
   def show(self):
     " plotting 2D footprint in image plane, returns figure handle"
-    x,y=self.points;    
     fig,(ax1,ax2)= plt.subplots(2);
+    # footprint
     ax1.set_title("footprint in image plane");
-    ax1.tripcolor(x,y,self.intensity);
-    # radial profile
+    ax1.tripcolor(self.points[0],self.points[1],self.intensity);
+    # azimuthal average
+    r, radial_profile, encircled_energy = self.radial_projection();
     ax2.set_title("radial profile");    
+    ax2.plot(r,radial_profile,label='radial profile');
+    ax2.plot(r,encircled_energy,label='encircled energy');
+    ax2.legend(loc=0)
+    logging.info('total power: %5.3f W'%(encircled_energy[-1])); 
+    return fig
+    
+  def radial_projection(self):
+    """
+    Calculate azimuthal avererage over detector (radial projection).
+    Return: r, radial_profile, encircled_energy, shape: (nrings,)
+    """
     Nr=np.insert(np.cumsum(self.points_per_ring),0,0); # index array for rings, size (nrings+1,)
+    # radial profile    
     radial_profile = np.empty(self.nrings);
     r = np.empty(self.nrings);
     for i in xrange(self.nrings):
@@ -164,18 +211,9 @@ class PolarImageDetector(Detector):
       r2 = np.sum(self.points[:,Nr[i]:Nr[i+1]]**2,axis=0)
       assert np.allclose(r2[0],r2);
       r[i] = np.sqrt(r2[0]);
-    ax2.plot(r,radial_profile,label='radial profile');
-    
     # encircled energy (area of ring = weight of ring x total area of detector)
     encircled_energy = np.cumsum(radial_profile*self.weight_of_ring*np.pi*self.rmax**2);
-    ax2.plot(r,encircled_energy,label='encircled energy');
-    ax2.legend(loc=0)
-    logging.info('total intensity: %5.3f W'%(encircled_energy[-1])); 
-    return fig
-    
-    
-    
-      
+    return r, radial_profile, encircled_energy
 
 class Transmission(object):
   def __init__(self, parameters, mesh_points, raytrace, detectors, weights=None):
