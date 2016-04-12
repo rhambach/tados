@@ -95,60 +95,73 @@ class RectImageDetector(Detector):
       mask = point_in_triangle(self.points,triangle);
       self.intensity += density[s]*mask;
 
-  def show(self):
-    " plotting 2D footprint in image plane, returns figure handle"
-    fig,(ax1,ax2)= plt.subplots(2);
+  def show(self,fMask=None):
+    """
+    plotting 2D footprint and projected intensities in image plane
+      fMask ... (opt) function bMask = fMask(x,y) specifies for each pixel, if
+                      it contributes to the signal (bMask=0) or not (bMask=1)
+    Return: figure handle
+    """
+    X,Y,intensity = self.get_footprint(fMask); 
+    x,xprofile = self.x_projection(fMask);
+    y,yprofile = self.y_projection(fMask);    
     # footprint    
-    x,y,intensity = self.get_footprint(); 
+    fig,(ax1,ax2)= plt.subplots(2);
     ax1.set_title("footprint in image plane");
     ax1.imshow(intensity,origin='lower',aspect='auto',interpolation='hanning',
              extent=[x[0],x[-1],y[0],y[-1]]);
     # projections    
     ax2.set_title("projected intensity in image plane");    
-    x,xprofile = self.x_projection();
-    y,yprofile = self.y_projection();    
     ax2.plot(x,xprofile,label="along y");
     ax2.plot(y,yprofile,label="along x");
     ax2.legend(loc=0)
     # total intensity
     dx = x[1]-x[0]; dy = y[1]-y[0];
-    assert(np.allclose(np.sum(intensity)*dx*dy, 
-                       [np.sum(xprofile)*dx,np.sum(yprofile)*dy])); # total power must be the same
+    if fMask is None:  
+      assert(np.allclose(np.sum(intensity)*dx*dy, 
+                        [np.sum(xprofile)*dx,np.sum(yprofile)*dy])); # total power must be the same
     logging.info('total power: %5.3f W'%(np.sum(intensity)*dx*dy)); 
     return fig
-    
-  def get_footprint(self):
+
+  def get_footprint(self,fMask=None):
     """
-    returns x,y,intensity:
-      x,y      ... axes of the detector, shape (xnum,), (ynum,)
-      intensity... 2d intensity from detector, shape (xnum,ynum)
+    returns X,Y,intensity:
+      fMask ... (opt) function bMask = fMask(x,y) specifies for each pixel, if
+                      it contributes to the signal (bMask=0) or not (bMask=1)
+    Return:
+      X,Y      ... coordinates of the detector, shape (xnum,ynum)
+      intensity... 2d intensity from detector,  shape (xnum,ynum)
     """
     Nx,Ny = self.pixels;
-    img_pixels_2d = self.points.reshape(2,Ny,Nx);
-    image_intensity = self.intensity.reshape(Ny,Nx);
-    xaxis = img_pixels_2d[1,:,0]; 
-    yaxis = img_pixels_2d[0,0,:];
-    return xaxis,yaxis,image_intensity
+    X,Y   = self.points.reshape(2,Ny,Nx);
+    image_intensity = self.intensity.reshape(Ny,Nx).copy();
+    if fMask is not None:
+      image_intensity[fMask(X,Y)] = 0
+    return X,Y,image_intensity
     
-  def x_projection(self):
+  def x_projection(self,fMask=None):
     """
     Calculate projection on x-axis.
+      fMask ... (opt) function bMask = fMask(x,y) specifies for each pixel, if
+                      it contributes to the signal (bMask=0) or not (bMask=1)
     Return: x, xprofile, shape: (xnum,)
     """
-    x,y,intensity = self.get_footprint();
-    dy = y[1]-y[0]; 
+    X,Y,intensity = self.get_footprint(fMask);
+    xaxis = Y[:,0];  yaxis = X[0,:];  dy = yaxis[1]-yaxis[0]; 
     xprofile = np.sum(intensity,axis=1)*dy; # integral over y
-    return x,xprofile;
+    return xaxis,xprofile;
     
-  def y_projection(self):
+  def y_projection(self,fMask=None):
     """
     Calculate projection on y-axis.
+      fMask ... (opt) function bMask = fMask(x,y) specifies for each pixel, if
+                      it contributes to the signal (bMask=0) or not (bMask=1)
     Return: y, yprofile, shape: (ynum,)
     """
-    x,y,intensity = self.get_footprint();
-    dx = x[1]-x[0]; 
-    yprofile = np.sum(intensity,axis=0)*dx; # integral over y  
-    return y,yprofile;
+    X,Y,intensity = self.get_footprint(fMask);
+    xaxis = Y[:,0];  yaxis = X[0,:];  dx = xaxis[1]-xaxis[0]; 
+    yprofile = np.sum(intensity,axis=0)*dx; # integral over x  
+    return yaxis,yprofile;
     
 class PolarImageDetector(Detector):    
   "2D Image Detector with polar coordinates"
@@ -196,6 +209,14 @@ class PolarImageDetector(Detector):
     ax2.legend(loc=0)
     logging.info('total power: %5.3f W'%(encircled_energy[-1])); 
     return fig
+
+  def get_footprint(self):
+    """
+    returns X,Y,intensity:
+      X,Y      ... coordinates of the detector, shape (nPoints)
+      intensity... 2d intensity from detector,  shape (nPoints)
+    """
+    return self.points[0], self.points[1], self.intensity.copy()
     
   def radial_projection(self):
     """

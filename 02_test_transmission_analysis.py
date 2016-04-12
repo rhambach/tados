@@ -49,6 +49,10 @@ def __test_intensity_footprint(hDDE):
   # plotting
   img.show();
 
+  # analyze img detector in detail (left and right sight separately)
+  img.show(fMask = lambda x,y: np.logical_or(2*x+y<0, x>0.018))  
+  img.show(fMask = lambda x,y: 2*x+y>=0)
+  
 
 def __test_angular_distribution(hDDE):
   # raytrace parameters
@@ -105,5 +109,5 @@ if __name__ == '__main__':
     filename= os.path.realpath('./tests/pupil_slicer.ZMX');
     hDDE.load(filename);
     __test_intensity_footprint(hDDE);
-    __test_angular_distribution(hDDE);
+    #__test_angular_distribution(hDDE);
     
