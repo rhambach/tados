@@ -44,6 +44,8 @@ class AdaptiveMesh(object):
     # current domain and image during refinement and for plotting
     self.domain = self.initial_domain;    
     self.image  = self.initial_image;   
+    # initial domain area
+    self.initial_domain_area = np.sum(self.get_area_in_domain());
     
           
   def get_mesh(self):
@@ -212,8 +214,8 @@ class AdaptiveMesh(object):
     #      p3 *        * p4
     #        /          \          new triangles:
     #       /____________\           (C,p1,p2),             isolated point + closest two new points  
-    #      A              B          (p1,p2,p3),(p2,p3,p4)  new broken triangles, only between new sampling points
-    #                                (p3,p4,A), (p4,A,B):   rest
+    #      A              B          (p1,p3,p2),(p2,p3,p4)  new broken triangles, only between new sampling points
+    #                                (p4,p3,A), (p4,A,B):   rest
     # 
     # Note: one has to pay attention, that C,p1,p3,A are located on same side
     #       of the triangle, otherwise the partition will fail!     
@@ -223,23 +225,13 @@ class AdaptiveMesh(object):
     edge_len = np.sum( np.diff(vertices,axis=1)**2, axis=2); # shape (nTriangles,3)
     min_edge = np.argmin( edge_len,axis=1);                # shape (nTriangles)
  
-    # get indices of points ABC as shown above (C is isolated point)
-    ind_triangle = np.arange(nTriangles)
-    A = simplices[ind_triangle,min_edge];           # first point of shortest side
-    B = simplices[ind_triangle,(min_edge+1)%3];     # second point of shortest side
-    C = simplices[ind_triangle,(min_edge+2)%3];     # point opposit to shortest side
-    
-    # create dense sampling along C->B and C->A in domain space
-    x = np.linspace(0,1,nDivide,endpoint=True);
-    CA = np.outer(1-x,self.domain[C]) + np.outer(x,self.domain[A]);
-    CB = np.outer(1-x,self.domain[C]) + np.outer(x,self.domain[B]);
-                                                    # sampling of shape (Ndivide,nTriangles*2)    
-    # map sampling on CA and CB to image space and measure length of segments in image space
-    domain_points= np.hstack((CA,CB)).reshape(nDivide,2,nTriangles,2);
-    image_points = self.mapping(domain_points.reshape(-1,2)).reshape(nDivide,2,nTriangles,2);
+    # find point as C (opposit to min_edge) and resample CA and CB
+    indC = min_edge-1;
+    A,B,C,domain_points,image_points = self.__resample_edges_of_triangle(simplices,indC,nDivide);
+                                                           # shape (nDivide,2,nTriangles,2)
+    # determine indices of broken segments (largest elements in CA and CB)
     len_segments = np.sum(np.diff(image_points,axis=0)**2,axis=-1); 
                                                     # shape (nDivide-1,2,nTriangle)
-    # determine indices of broken segments (largest elements in CA and CB)
     largest_segments = np.argmax(len_segments,axis=0); # shape (2,nTriangle) 
     edge_points = np.asarray((largest_segments,largest_segments+1));
                                                     # shape (2,2,nTriangle)
@@ -274,9 +266,9 @@ class AdaptiveMesh(object):
                                                     # shape (nTriangles,)
     # construct the five triangles from points
     t1=np.vstack((C,p1,p2));                        # shape (3,nTriangles)
-    t2=np.vstack((p1,p2,p3));
+    t2=np.vstack((p1,p3,p2));
     t3=np.vstack((p2,p3,p4));
-    t4=np.vstack((p3,p4,A));
+    t4=np.vstack((p4,p3,A));
     t5=np.vstack((p4,A,B));
     new_simplices = np.hstack((t1,t2,t3,t4,t5)).T;  
        # shape (5*nTriangles,3), reshape as (5,nTriangles,3) to obtain subdivision of each triangle  
@@ -290,24 +282,13 @@ class AdaptiveMesh(object):
         pt=self.domain[subdiv]; ax1.plot(pt[...,0],pt[...,1],'r')
         pt=self.image[subdiv];  ax2.plot(pt[...,0],pt[...,1],'r')
 
-    # we remove degenerated triangles (p1..4 identical ot A,B or C) 
-    # and orient all triangles ccw in domain before adding them to the list of simplices
-    area = self.get_area_in_domain(new_simplices);
-    new_simplices[area<0] = new_simplices[area<0,::-1]; # reverse cw triangles
-    new_simplices = new_simplices[area<>0];             # remove degenerate triangles
-
     # sanity check that total area did not change after segmentation
     old = np.sum(np.abs(self.get_area_in_domain(simplices)));
     new = np.sum(np.abs(self.get_area_in_domain(new_simplices)));
     assert(abs((old-new)/old)<1e-10) # segmentation of triangle has no holes/overlaps
-      
-    # update simplices in mesh    
-    self.__tri = None; # delete initial Delaunay triangulation        
-    self.simplices=np.vstack((self.simplices[~broken], new_simplices)); # no longer Delaunay
 
-    # return number of new triangles
-    return new_simplices.shape[0]
-    
+    # update list of simplices
+    return self.__add_new_simplices(new_simplices,broken);  
     
     
   def refine_invalid_triangles(self,nDivide=10,bPlot=False,bPlotTriangles=[0]):
@@ -343,9 +324,8 @@ class AdaptiveMesh(object):
     
     # update list of simplices
     bReplace=np.logical_or(ind_case1,ind_case1);
-    self.__add_new_simplices(new_simplices,bReplace);
+    return self.__add_new_simplices(new_simplices,bReplace);
     
-    return new_simplices.shape[0];
     
   def __subdivide_triangles_with_one_invalid_vertex(self,bInvalid,nDivide=10):
     """
@@ -479,10 +459,11 @@ class AdaptiveMesh(object):
         bReplace      ... shape(self.simplices.shape[0])
       returns: number of added triangles
     """
-    # remove degenerated triangles (p1,p2 identical to A or B) 
-    area = self.get_area_in_domain(new_simplices);
-    new_simplices = new_simplices[area<>0];             # remove degenerate triangles
-    assert(np.all(area>0));                             # by construction all triangles are ccw
+    # remove degenerated triangles (p1,p2 identical to A or B) => area is 0 
+    area = self.get_area_in_domain(new_simplices);    
+    degenerated = np.abs(area/self.initial_domain_area)<1e-10;
+    new_simplices = new_simplices[~degenerated];        # remove degenerate triangles
+    assert(np.all(area[~degenerated]>0));               # by construction all triangles are oriented ccw
     # update simplices in mesh    
     self.__tri = None; # delete initial Delaunay triangulation        
     self.simplices=np.vstack((self.simplices[~bReplace], new_simplices)); # no longer Delaunay
