@@ -178,7 +178,7 @@ class PolarImageDetector(Detector):
     """
     self.rmax = rmax;
     self.nrings = nrings;
-    ret = polar_sampling(nrings,rmax=rmax,ind=True); 
+    ret = hexapolar_sampling(nrings,rmax=rmax,ind=True); 
     self.points = np.asarray(ret[0:2]);     # shape: (2,nPixels)
     self.points_per_ring = ret[2];          # shape: (nrings,)
     self.weight_of_ring  = ret[3];          # shape: (nrings,)

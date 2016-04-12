@@ -111,42 +111,38 @@ def cartesian_sampling(nx,ny,rmax=1.):
   ind = x**2 + y**2 <= rmax;
   return x[ind],y[ind]
 
-def polar_sampling(Nr,rmax=1.,ind=False):
+def hexapolar_sampling(Nr,rmax=1.,ind=False):
   """
-  polar sampling with roughly equi-area sampling point distribution
+  hexapolar sampling with roughly equi-area sampling point distribution
    Nr   ... number of rings, last ring has index (Nr-1)
    rmax ... normalization radius
-   ind  ... (opt) return index arrays indicating ring boundaries and weights of each ring
+   ind  ... (opt) return number of points and weights of each ring
   """
-  
-  # bin edges:  0.5, 1.5, 2.5, ..., Nr-1.5, Nr-0.5
-  # bin centers:   1,   2,   3,   ...,   Nr-1
-  bins = (np.arange(Nr)+0.5)/(Nr-0.5)*rmax;  # edges of radial bins (except first ring)
-  area = np.diff(bins**2)/rmax**2;           # normalized area of each ring
-  r = np.arange(1,Nr)/(Nr-0.5)*rmax;         # bin centers
-  assert np.allclose( r, (bins[1:]+bins[0:-1])/2);               
-  # number of points per ring is calculated from approx. area in ring:
-  # area = pi(r+dr)^2 - pi(r-dr)^2 ~ pi*r*dr  := Ntet*dr^2
-  # => Ntet = pi*r/dr = pi*[1,2,3,...]
-  Ntet = np.round(np.pi*np.arange(1,Nr));
-  # construct grid points in each ring
+  r = np.arange(1,Nr,dtype=np.double)/Nr*rmax;               # ring centers
+  Ntet = 6*np.arange(1,Nr);                  # number of points on each ring
+  # construct grid points in each ring  
   x=[0]; y=[0];                              # first ring
-  for i in xrange(Nr-1):  
+  for i in xrange(Nr-1):
     tet = np.linspace(0,2*np.pi,Ntet[i],endpoint=False);
-    tet+= i*np.pi/(1+np.sqrt(5));            # offset for each second ring
     x.extend(r[i]*np.cos(tet));
     y.extend(r[i]*np.sin(tet));
   x=np.asarray(x).flatten();
   y=np.asarray(y).flatten();
-  # handle zero'th ring
-  if ind:
-    w = np.insert(area,0,(0.5/(Nr-0.5))**2);
-    Ntet = np.insert(Ntet,0,1);
-    assert np.allclose(np.sum(w),1);
-    return x,y,Ntet,w
+  # calculate number of points and weight of each ring, if desired
+  if ind==False: 
+    return x,y;
+  elif Nr==1:
+    return x,y,[1],[1];
   else:
-    return x,y
-  
+    # calculate area of each ring Nr>1
+    dr = r[1]-r[0];    
+    area = ( (r+dr/2.)**2 - (r-dr/2.)**2 );
+    # add first ring    
+    area = np.insert(area,0, (dr/2.)**2);
+    Ntet = np.insert(Ntet,0, 1);
+    return x,y,Ntet,area/rmax**2;
+    
+      
 def fibonacci_sampling(N,rmax=1.):
   """
   Fibonacci sampling in reduced coordinates (normalized to 1)
@@ -173,6 +169,6 @@ def fibonacci_sampling_with_circular_boundary(N,Nboundary=32,rmax=1.):
   
 
 if __name__ == '__main__':
-  x,y,Ntet,w = polar_sampling(50,ind=True);
+  x,y,Ntet,w = hexapolar_sampling(20,ind=True);
   plt.figure();
   plt.scatter(x,y);

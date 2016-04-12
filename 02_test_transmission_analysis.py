@@ -109,5 +109,5 @@ if __name__ == '__main__':
     filename= os.path.realpath('./tests/pupil_slicer.ZMX');
     hDDE.load(filename);
     __test_intensity_footprint(hDDE);
-    #__test_angular_distribution(hDDE);
+    __test_angular_distribution(hDDE);
     

@@ -121,7 +121,7 @@ class AdaptiveMesh(object):
     # calculate maximum of (squared) length of two sides of each triangle 
     # (X[0]-X[1])**2 + (Y[0]-Y[1])**2; (X[1]-X[2])**2 + (Y[1]-Y[2])**2 
     max_lensq = np.max(np.sum(np.diff(triangles,axis=1)**2,axis=2),axis=1);
-    # mark triangle as broken, if max side is 10 times larger than median value
+    # mark triangle as broken, if max side is 3 times larger than median value
     if lthresh is None: lthresh = 3*np.sqrt(np.median(max_lensq));
     return max_lensq > lthresh**2;
  
