@@ -30,7 +30,10 @@ def __test_intensity_footprint(hDDE):
 
 
   # field sampling (octagonal fiber)
-  xx,yy=cartesian_sampling(3,3,rmax=2);   # low: 7x7, high: 11x11
+  # sampling should be rational approx. of tan(pi/8), using continued fractions:
+  # approx tan(pi/2) = [0;2,2,2,2,....] ~ 1/2, 2/5, 5/12, 12/29, 29/70, 70/169
+  # results in samplings: (alwoys denominator-1): 4,11,28,69,168
+  xx,yy=cartesian_sampling(4,4,rmax=2);   # low: 4x4, high: 11x11
   ind = (np.abs(xx)<=1) & (np.abs(yy)<=1) & \
               (np.abs(xx+yy)<=np.sqrt(2)) & (np.abs(xx-yy)<=np.sqrt(2));
   field_sampling = np.vstack((xx[ind],yy[ind])).T;       # size (nFieldPoints,2)

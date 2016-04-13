@@ -97,8 +97,8 @@ class RectImageDetector(Detector):
       bSkip... logical array indicating simplices that should be skipped
       weight.. weight of contribution (intensity in Watt)
     """
-    domain_area = mesh.get_area_in_domain(); 
-    domain_area /= np.sum(np.abs(domain_area));   # normalized weight in domain
+    domain_area = mesh.get_area_in_domain();
+    domain_area/= mesh.initial_domain_area;       # normalized weight in domain
     image_area  = mesh.get_area_in_image();       # size of triangle in image
     density = weight * abs( domain_area / image_area);
     for s,simplex in enumerate(mesh.simplices):
@@ -199,7 +199,7 @@ class PolarImageDetector(Detector):
       weight.. weight of contribution (intensity in Watt)
     """
     domain_area = mesh.get_area_in_domain(); 
-    domain_area /= np.sum(np.abs(domain_area));   # normalized weight in domain
+    domain_area/= mesh.initial_domain_area;       # normalized weight in domain
     image_area  = mesh.get_area_in_image();       # size of triangle in image
     density = weight * abs( domain_area / image_area);
     for s,simplex in enumerate(mesh.simplices):

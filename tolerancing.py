@@ -17,7 +17,26 @@ class ToleranceSystem(object):
     self.filename=filename;
     self.reset();
         
-    
+      
+  def reset(self):
+    " reset system to original state"
+    self.hDDE.load(self.filename);
+    self.ln.zPushLens(1);
+
+    self.numSurf = self.ln.zGetNumSurf();
+    # index arrays for conversion between real and all surfaces
+    self.__isRealSurf = np.ones(self.numSurf,dtype=bool);
+    self.__real2all = np.arange(self.numSurf);
+    self.__all2real = np.arange(self.numSurf);    
+    self.__R0, self.__t0 = self.__get_surface_coordinates();
+
+  def get_orig_surface(self,orig_surface_index):
+    """
+    returns index of given surface in distorted system (which includes dummy surfaces)
+      orig_surface_index ... index of surface in initial system
+    """
+    return self.__real2all[orig_surface_index];    
+  
   def __get_surface_coordinates(self):
     """
     returns for each surface in the system, the global rotation matrix 
@@ -150,18 +169,6 @@ class ToleranceSystem(object):
     return self.tilt_decenter_elements(firstSurf,lastSurf,ytilt=val)
   def TETZ(self,firstSurf,lastSurf,val):
     return self.tilt_decenter_elements(firstSurf,lastSurf,ztilt=val)
-    
-  def reset(self):
-    " reset system to original state"
-    self.hDDE.load(self.filename);
-    self.ln.zPushLens(1);
-
-    self.numSurf = self.ln.zGetNumSurf();
-    # index arrays for conversion between real and all surfaces
-    self.__isRealSurf = np.ones(self.numSurf,dtype=bool);
-    self.__real2all = np.arange(self.numSurf);
-    self.__all2real = np.arange(self.numSurf);    
-    self.__R0, self.__t0 = self.__get_surface_coordinates();
 
 
 if __name__ == '__main__':

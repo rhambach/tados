@@ -22,17 +22,21 @@ def __test_tolerancing(tol):
   def raytrace(params, pupil_points):      # local function for raytrace
     x,y   = params;      
     px,py = pupil_points.T;                # shape (nPoints,)
-    ret   = tol.hDDE.trace_rays(x,y,px,py,wavenum,surf=image_surface);
+    isurf = tol.get_orig_surface(image_surface);
+    ret   = tol.hDDE.trace_rays(x,y,px,py,wavenum,surf=isurf);
     error = ret[:,0];
     vigcode= ret[:,[1]];     
     xy    = ret[:,[2,3]];    
     # return (x,y) coordinates in image space    
     xy   += image_size*(vigcode<>0);       # include vignetting by shifting ray outside image
     xy[error<>0]=np.nan;                   # rays that could not be traced
-    return xy;                             
+    return xy;                           
 
   # field sampling (octagonal fiber)
-  xx,yy=cartesian_sampling(3,3,rmax=2);   # low: 7x7, high: 11x11
+  # sampling should be rational approx. of tan(pi/8), using continued fractions:
+  # approx tan(pi/2) = [0;2,2,2,2,....] ~ 1/2, 2/5, 5/12, 12/29, 29/70, 70/169
+  # results in samplings: (alwoys denominator-1): 4,11,28,69,168
+  xx,yy=cartesian_sampling(4,4,rmax=2);   # low: 4x4, high: 11x11
   ind = (np.abs(xx)<=1) & (np.abs(yy)<=1) & \
               (np.abs(xx+yy)<=np.sqrt(2)) & (np.abs(xx-yy)<=np.sqrt(2));
   field_sampling = np.vstack((xx[ind],yy[ind])).T;       # size (nFieldPoints,2)
@@ -41,7 +45,7 @@ def __test_tolerancing(tol):
   plt.xlabel('x'); plt.ylabel('y');
   
   # pupil sampling (circular, adaptive mesh)
-  px,py=fibonacci_sampling_with_circular_boundary(50,30) # low: (50,20), high: (200,50)
+  px,py=fibonacci_sampling_with_circular_boundary(200,50) # low: (50,20), high: (200,50)
   pupil_sampling = np.vstack((px,py)).T;                 # size (nPoints,2)
   
   # set up image detector
@@ -51,6 +55,9 @@ def __test_tolerancing(tol):
 
   # disturb system (tolerancing)
   tol.change_thickness(5,12,value=2); # shift of pupil slicer
+  tol.tilt_decenter_elements(1,3,ydec=0.02);  # [mm]
+  tol.TETX(1,3,3.001) # [deg]
+  tol.print_current_geometric_changes();
   
   # run Transmission calculation
   T = Transmission(field_sampling,pupil_sampling,raytrace,[dbg,img]);
@@ -68,7 +75,7 @@ def __test_tolerancing(tol):
 if __name__ == '__main__':
   import os as os
   import sys as sys
-  logging.basicConfig(level=logging.DEBUG);
+  logging.basicConfig(level=logging.INFO);
   
   with DDElinkHandler() as hDDE:
   
