@@ -110,7 +110,7 @@ class AdaptiveMesh(object):
     return 0.5 * ( (x[1]-x[0])*(y[2]-y[0]) - (x[2]-x[0])*(y[1]-y[0]) );
   
   
-  def get_broken_triangles(self,simplices=None,lthresh=None):
+  def get_broken_triangles(self,simplices=None,lthresh=None,):
     """
     identify triangles that are cut in image space or include invalid vertices
       simplices ... (opt) list of simplices, shape (nTriangles,3)  
@@ -125,7 +125,7 @@ class AdaptiveMesh(object):
     # (X[0]-X[1])**2 + (Y[0]-Y[1])**2; (X[1]-X[2])**2 + (Y[1]-Y[2])**2 
     max_lensq = np.max(np.sum(np.diff(triangles,axis=1)**2,axis=2),axis=1);
     # default: mark triangle as broken, if max side is 3 times larger than median value
-    if lthresh is None: lthresh = 3*np.sqrt(np.median(max_lensq));
+    if lthresh is None: lthresh = 3*np.sqrt(np.nanmedian(max_lensq));
     # valid triangles: all sides smaller than lthresh, none of its vertices invalid (np.nan)
     bValid = max_lensq < lthresh**2; 
     return ~bValid;   # Note: differs from (max_lensq >= lthresh**2), if some vertices are invalid!
@@ -189,13 +189,8 @@ class AdaptiveMesh(object):
     # check if any of the triangles has an invalid vertex (x or y coordinate is np.nan)
     bInvalidVertex = np.any(np.isnan(triangles),axis=2);   # shape (nTriangles,3)
     if np.sum(bInvalidVertex)>0:
-      # exclude triangles that have only invalid vertices      
-      keep = ~np.all(bInvalidVertex,axis=1);               # shape (nTriangles,)
-      broken[broken] = keep;                               # shape (nSimplices,)
-      simplices=simplices[keep];
-      triangles=triangles[keep];
+      raise RuntimeError("Mesh contains invalid points. Call Mesh.refine_invalid_triangles() first.");
       
-
     # check if subdivision is needed at all    
     nTriangles = np.sum(broken)
     if nTriangles==0: return 0;                 # noting to do!
@@ -244,7 +239,7 @@ class AdaptiveMesh(object):
               # shape (2,2,nTriangle,2), indicating iDistance,iEdge,iTriangle,(x/y)
  
     # update points in mesh (points are no longer unique!)
-    logging.info("refining_broken_triangles(): adding %d points"%(4*nTriangles));
+    logging.debug("refining_broken_triangles(): adding %d points"%(4*nTriangles));
     self.image = np.vstack((self.image,new_image_points.reshape(-1,2))); 
     self.domain= np.vstack((self.domain,new_domain_points.reshape(-1,2)));    
    
@@ -299,31 +294,33 @@ class AdaptiveMesh(object):
       bPlotTriangles (opt) list of triangle indices for which segmentation should be shown
 
     returns: number of new triangles
-    Note: The resulting mesh will be no longer a Delaunay mesh (identical points 
-          might be present, circumference rule not guaranteed). Mesh functions, 
-          that need this property (like refine_large_triangles()) will not work
-          after calling this function.
+    
+    Note: This function might also reuse refine_broken_triangles(), if we 
+          replace NaN's by a very large but finit number. However it might
+          be less clean.
+    Note: The resulting mesh will be no longer a Delaunay mesh (identical 
+          points might be present, circumference rule n ot guaranteed) 
+          and the total area in domain is reduced.
     """
     vertices = self.image[self.simplices];                 # shape (nSimplices,3,2)    
     bInvalidVertex = np.any(np.isnan(vertices),axis=2);    # shape (nSimplices,3)   
     if ~np.any(bInvalidVertex): return 0;                  # nothing to do
     
-    # we only consider two cases: one vertex is invalid (generate two new triangles)
-    #  or two vertices are invalid (generate one new triangle)
-    #  all other triangles are unchanged
+    # we consider three cases: 
+    #  1. one vertex is invalid (generate two new triangles)
+    #  2. two vertices are invalid (generate one new triangle)
+    #  3. all vertices are invalid (triangle is skipped)
+    # all triangles with only valid vertices are unchanged
     nInvalidVertices = np.sum(bInvalidVertex,axis=1);      # shape (nSimplices)
+    new_simplices=[]; 
     ind_case1 = nInvalidVertices==1;
+    new_simplices.extend(self.__subdivide_triangles_with_one_invalid_vertex(ind_case1,nDivide));
     ind_case2 = nInvalidVertices==2;
-    
-    new_simplices=[];    
-    if np.any(ind_case1):
-      new_simplices.extend(self.__subdivide_triangles_with_one_invalid_vertex(ind_case1,nDivide));
-    if np.any(ind_case2):
-      new_simplices.extend(self.__subdivide_triangles_with_two_invalid_vertices(ind_case2,nDivide));
+    new_simplices.extend(self.__subdivide_triangles_with_two_invalid_vertices(ind_case2,nDivide));
     new_simplices=np.reshape(new_simplices,(-1,3));    
     
     # update list of simplices
-    bReplace=np.logical_or(ind_case1,ind_case1);
+    bReplace=nInvalidVertices>0;   # includes case 1, 2 and 3
     return self.__add_new_simplices(new_simplices,bReplace);
     
     
@@ -341,6 +338,7 @@ class AdaptiveMesh(object):
            /___________\           (p1,A,p2),(A,B,p2)
           A              B 
     """
+    if ~np.any(bInvalid): return [];                       # nothing to do
     simplices = self.simplices[bInvalid];                  # shape (nTriangles,3)
     triangles = self.image[simplices];                     # shape (nTriangles,3,2)
     nTriangles= triangles.shape[0];
@@ -368,7 +366,7 @@ class AdaptiveMesh(object):
       new_simplices.extend(((P1,A[k],P2), (A[k],B[k],P2)));
 
     # update points in mesh (points are no longer unique!)
-    logging.info("refine_invalid_triangles(case1): adding %d points"%(2*nTriangles));
+    logging.debug("refine_invalid_triangles(case1): adding %d points"%(2*nTriangles));
     self.image = np.vstack((self.image,np.reshape(new_image_points,(2*nTriangles,2)))); 
     self.domain= np.vstack((self.domain,np.reshape(new_domain_points,(2*nTriangles,2))));  
 
@@ -388,6 +386,7 @@ class AdaptiveMesh(object):
            xxxxxxxxxxxxxx           (p1,p2,C)
           A              B 
     """
+    if ~np.any(bInvalid): return [];                       # nothing to do
     simplices = self.simplices[bInvalid];                  # shape (nTriangles,3)
     triangles = self.image[simplices];                     # shape (nTriangles,3,2)
     nTriangles= triangles.shape[0];
@@ -416,7 +415,7 @@ class AdaptiveMesh(object):
       new_simplices.append((P1,P2,C[k]));
  
     # update points in mesh (points are no longer unique!)
-    logging.info("refine_invalid_triangles(case2): adding %d points"%(2*nTriangles));
+    logging.debug("refine_invalid_triangles(case2): adding %d points"%(2*nTriangles));
     self.image = np.vstack((self.image,np.reshape(new_image_points,(2*nTriangles,2)))); 
     self.domain= np.vstack((self.domain,np.reshape(new_domain_points,(2*nTriangles,2))));  
 

@@ -68,7 +68,7 @@ def __test_tolerancing(tol):
 if __name__ == '__main__':
   import os as os
   import sys as sys
-  logging.basicConfig(level=logging.INFO);
+  logging.basicConfig(level=logging.DEBUG);
   
   with DDElinkHandler() as hDDE:
   

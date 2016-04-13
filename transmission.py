@@ -25,7 +25,7 @@ from zemax_dde_link import *
 class Detector(object):
   __metaclass__ = abc.ABCMeta
   @abc.abstractmethod
-  def add(self,mesh,skip=None,weight=1): return;
+  def add(self,mesh,bSkip=[],weight=1): return;
   @abc.abstractmethod  
   def show(self): return;
 
@@ -39,22 +39,28 @@ class CheckTriangulationDetector(Detector):
     """
     self.ref_domain_area=ref_area;
   
-  def add(self,mesh,skip=None,weight=1):
+  def add(self,mesh,bSkip=[],weight=1):
     """
     calculate total domain area of mesh and print logging info 
       mesh ... instance of AdaptiveMesh 
-      skip ... indices which simplices should be skipped
+      bSkip... logical array indicating simplices that should be skipped
       weight.. ignored
     """
-    triangle_area  = mesh.get_area_in_domain(); 
-    assert(all(triangle_area>0));  # triangles should be oriented ccw in mesh    
-    mesh_domain_area= np.sum(np.abs(triangle_area));
-    err_boundary= 1-mesh_domain_area/self.ref_domain_area;
-    out = 'error of triangulation of mesh: \n' + \
-     '  %5.3f%% due to approx. of mesh boundary \n'%(err_boundary*100);
-    if skip is not None:
-      err_skip  = np.sum(triangle_area[skip])/mesh_domain_area;
-      out += '  %5.3f%% due to skipped triangles' %(err_skip*100);
+    triangle_area  = mesh.get_area_in_domain(); # domain area in current mesh
+    assert(all(triangle_area>0));  # triangles should be oriented ccw in mesh 
+    
+    # check error of initial sampling of domain boundary    
+    err_boundary= 1-mesh.initial_domain_area/self.ref_domain_area;
+    out = 'estimated loss of power due to triangulation of mesh: \n' + \
+     '  %5.3f%% due to initial approximation of mesh boundary \n'%(err_boundary*100);   
+    # check error due to invalid triangles (raytrace errors for one of its vertices)
+    tot_triangle_area= np.sum(np.abs(triangle_area));
+    err_invalid = 1-tot_triangle_area / mesh.initial_domain_area;
+    if np.abs(err_invalid)>1e-8:
+      out += '  %5.3f%% due to invalid triangles (raytrace errors)\n' %(err_invalid*100);
+    if np.any(bSkip):
+      err_skip  = np.sum(triangle_area[bSkip]) / mesh.initial_domain_area;
+      out += '  %5.3f%% due to broken triangles (contain discontinuity) \n' %(err_skip*100);
     logging.info(out);
     #image_area = Mesh.get_area_in_image();
     #if any(image_area<0) and any(image_area>0):
@@ -84,19 +90,20 @@ class RectImageDetector(Detector):
     self.points = np.asarray(np.meshgrid(x,y,indexing='ij')); # shape: (2,numx,numy)
     self.intensity = np.zeros(self.pixels);                   # shape: (numx,numy)
 
-  def add(self,mesh,skip=None,weight=1):
+  def add(self,mesh,bSkip=[],weight=1):
     """
     calculate footprint in image plane
       mesh ... instance of AdaptiveMesh 
-      skip ... indices which simplices should be skipped
+      bSkip... logical array indicating simplices that should be skipped
       weight.. weight of contribution (intensity in Watt)
     """
     domain_area = mesh.get_area_in_domain(); 
     domain_area /= np.sum(np.abs(domain_area));   # normalized weight in domain
     image_area  = mesh.get_area_in_image();       # size of triangle in image
     density = weight * abs( domain_area / image_area);
-    for s in np.where(~skip)[0]:
-      triangle = mesh.image[mesh.simplices[s]];
+    for s,simplex in enumerate(mesh.simplices):
+      if len(bSkip)>0 and bSkip[s]: continue
+      triangle = mesh.image[simplex];
       mask = point_in_triangle(self.points,triangle);
       self.intensity += density[s]*mask;
 
@@ -184,19 +191,20 @@ class PolarImageDetector(Detector):
     self.weight_of_ring  = ret[3];          # shape: (nrings,)
     self.intensity = np.zeros(self.points.shape[1]);  # 1d array
 
-  def add(self,mesh,skip=None,weight=1):
+  def add(self,mesh,bSkip=[],weight=1):
     """
     calculate footprint in image plane
       mesh ... instance of AdaptiveMesh 
-      skip ... indices which simplices should be skipped
+      bSkip... logical array indicating simplices that should be skipped
       weight.. weight of contribution (intensity in Watt)
     """
     domain_area = mesh.get_area_in_domain(); 
     domain_area /= np.sum(np.abs(domain_area));   # normalized weight in domain
     image_area  = mesh.get_area_in_image();       # size of triangle in image
     density = weight * abs( domain_area / image_area);
-    for s in np.where(~skip)[0]:
-      triangle = mesh.image[mesh.simplices[s]];
+    for s,simplex in enumerate(mesh.simplices):
+      if len(bSkip)>0 and bSkip[s]: continue
+      triangle = mesh.image[simplex];
       mask = point_in_triangle(self.points,triangle);
       self.intensity += density[s]*mask;
 
@@ -297,6 +305,6 @@ class Transmission(object):
       # update detectors
       broken = Mesh.get_broken_triangles(lthresh=lthresh);
       for d in self.detectors:
-        d.add(Mesh,skip=broken,weight=self.weights[ip]);
+        d.add(Mesh,bSkip=broken,weight=self.weights[ip]);
 
 
