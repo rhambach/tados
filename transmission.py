@@ -249,6 +249,7 @@ class PolarImageDetector(Detector):
     encircled_energy = np.cumsum(radial_profile*self.weight_of_ring*np.pi*self.rmax**2);
     return r, radial_profile, encircled_energy
 
+
 class Transmission(object):
   def __init__(self, parameters, mesh_points, raytrace, detectors, weights=None):
     """

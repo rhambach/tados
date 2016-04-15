@@ -9,6 +9,7 @@ import pyzdde.zdde as pyz
 import numpy as np
 import matplotlib.pylab as plt
 import logging
+import os as _os
 
 class DDElinkHandler(object):
   """
@@ -98,6 +99,60 @@ class DDElinkHandler(object):
     results = np.asarray( [(r.error,r.vigcode,r.x,r.y,r.z,r.l,r.m,r.n) for r in rays[1:]] );
     #print("retrive data: %ds"%(time.time()-t))    
     return results;
+
+
+  def zGeometricImageAnalysis(self,textFileName=None):
+    """
+    perform Geometric Image Analysis in Zemax and return Detector information
+      textFileName ... (opt) name of the textfile used for extracting data from Zemax
+      
+    Returns: (data,params)
+      data  ... 2D array containing detector intensity for each pixel [W/mm2], shape (Nx,Ny) 
+      params... dictionary with parameters of the image analysis
+    """  
+    
+    # set up temporary name for analysis data
+    if textFileName is None:
+      fdir = _os.path.dirname(self.link.zGetFile());
+      textFileName = _os.path.join(fdir,'__pyzdde_geometricImageSimulationAnalysisFile.txt');
+      
+    # perform Geometric Image Analysis (with current settings)
+    ret = self.link.zGetTextFile(textFileName,'Ima');
+    assert ret == 0, 'zGetTextFile() returned error code {}'.format(ret) 
+    lines = pyz._readLinesFromFile(pyz._openFile(textFileName))
+    assert(lines[0]=="Image analysis histogram listing");  # expect output of Image analysis
+    
+    # scan header
+    last_line_header = pyz._getFirstLineOfInterest(lines,'Units');
+    params = [];  
+    for line in lines[1:last_line_header+1]:
+      pos = line.find(':');    
+      if pos>0: params.append((line[0:pos].strip(), line[pos+1:].strip()));
+    params=dict(params);  
+    # ... might be improved
+    
+    # extract image size (e.g. '0.14 Millimeters')
+    imgSize = float(params['Image Width'].split()[0]);
+    Nrays   = int(params['Total Rays Launched']);
+    Nx,Ny   = map(int,params['Number of pixels'].split('x'));
+    totFlux = float(params['Total flux in watts']);
+    
+    # scan data (values in textfile are ordered like in Zemax Window, i.e.
+    #   with increasing column index, x increases from -imgSize/2 to imgSize/2
+    #   with increasing line   index, y decreases from imgSize/2 to -imgSize/2
+    first_line_data  = last_line_header+2;
+    # load text reads 2d matrix as index [line,column], corresponds here to [-y,x]
+    data = np.loadtxt(lines[first_line_data:]);
+    data = data[::-1].T;                           # reorder data as [x,y]
+    totFlux_data = np.sum(data)*imgSize**2/Nx/Ny;
+    assert (data.shape==(Nx,Ny));                  # correct number of pixels read from file
+    assert (abs(1-totFlux_data/totFlux) < 0.001);  # check that total flux is correct within 0.1%
+    #plt.figure()  
+    #plt.imshow(data.T,origin='lower',aspect='auto',interpolation='hanning',
+    #           cmap='gray',extent=np.array([-1,1,-1,1])*imgSize/2);  
+    
+    return data,params
+
 
 def cartesian_sampling(nx,ny,rmax=1.):
   """
