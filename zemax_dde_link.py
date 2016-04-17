@@ -101,14 +101,23 @@ class DDElinkHandler(object):
     return results;
 
 
-  def zGeometricImageAnalysis(self,textFileName=None):
+  def zGeometricImageAnalysis(self,textFileName=None,timeout=None):
     """
     perform Geometric Image Analysis in Zemax and return Detector information
-      textFileName ... (opt) name of the textfile used for extracting data from Zemax
+    
+    Parameters
+    ----------
+      textFileName: string
+        (opt) name of the textfile used for extracting data from Zemax
+      timeout:      integer
+        (opt) timeout in seconds
       
-    Returns: (data,params)
-      data  ... 2D array containing detector intensity for each pixel [W/mm2], shape (Nx,Ny) 
-      params... dictionary with parameters of the image analysis
+    Returns
+    ------
+      data:         2D array of shape (Nx,Ny)
+        detector intensity for each pixel [W/mm2] 
+      params:       dictionary
+        dictionary with parameters of the image analysis
     """  
     
     # set up temporary name for analysis data
@@ -117,7 +126,7 @@ class DDElinkHandler(object):
       textFileName = _os.path.join(fdir,'__pyzdde_geometricImageSimulationAnalysisFile.txt');
       
     # perform Geometric Image Analysis (with current settings)
-    ret = self.link.zGetTextFile(textFileName,'Ima');
+    ret = self.link.zGetTextFile(textFileName,'Ima',timeout=timeout);
     assert ret == 0, 'zGetTextFile() returned error code {}'.format(ret) 
     lines = pyz._readLinesFromFile(pyz._openFile(textFileName))
     assert(lines[0]=="Image analysis histogram listing");  # expect output of Image analysis

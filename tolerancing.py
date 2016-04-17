@@ -107,7 +107,7 @@ class ToleranceSystem(object):
       elif x==0:                   print "XROT",
       elif x==0 and y<>0 and z==0: print "YROT",
       elif x<>0 and y==0 and z==0: print "ZROT",
-      else:                        print " ROT"
+      else:                        print " ROT",
       
       if comment[s]: print "  (%s)"%(comment[s]);
       else: print ""

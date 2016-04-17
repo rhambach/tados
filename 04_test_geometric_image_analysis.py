@@ -25,7 +25,7 @@ def GeometricImageAnalysis(hDDE, testFileName=None):
     img   ... RectImageDetector object containing detector data
     params... dictionary with parameters of the image analysis
   """  
-  data,params = hDDE.zGeometricImageAnalysis(testFileName);
+  data,params = hDDE.zGeometricImageAnalysis(testFileName,timeout=1000);
   imgSize = float(params['Image Width'].split()[0]);
   
   # save results in RectImageDetector class
@@ -71,13 +71,14 @@ with DDElinkHandler() as hDDE:
   # compensator: rotate slicer around surface normal
   compensator_rotz(tol,3)
 
-  #tol.tilt_decenter_elements(1,3,ydec=0.02);  # [mm]
-  #tol.TETX(1,3,2.001) # [deg]
+  tol.tilt_decenter_elements(1,3,ydec=0.02);  # [mm]
+  #tol.TEX(1,3,.001) # [deg]
   tol.print_current_geometric_changes();
   
   # geometric image analysis
   img,params = GeometricImageAnalysis(hDDE);
   fig = img.show();
+  
 
   # analyze img detector in detail (left and right sight separately)
   right= lambda x,y: np.logical_or(2*x+y<0, x>0.07); # right detector side
@@ -97,19 +98,23 @@ with DDElinkHandler() as hDDE:
   int_tot = np.sum(inty_right)*dy + np.sum(inty_left)*dy; # [W]
   
   # cumulative sum for getting percentage of loss
-  cumx_right = np.cumsum(inty_right)*dy;
-  cumx_left  = np.cumsum(inty_left )*dy;
+  cumy_right = np.cumsum(inty_right)*dy;
+  cumy_left  = np.cumsum(inty_left )*dy;
+  cumy       = cumy_right+cumy_left;
+  cumy[y<-0.015]=0;
+  cumy[y>0.015]=0;
   
+  # find intensity in box of given width along y
+  
+  for ny in np.arange(np.floor(0.025/dy), np.ceil(0.04/dy), 1):
+    print (ny+1)*dy, np.max(cumy[ny:]-cumy[:-ny]);  
+
   # where is loss 1mW ?
   thresh = [0.0001, 0.0005, 0.001, 0.002];  # [W]
-  print find_quantiles(x, cumx_right, thresh); 
-  print find_quantiles(x[::-1], np.cumsum(inty_right[::-1])*dy, thresh); 
-  
-  print find_quantiles(x, cumx_left, thresh); 
+  print find_quantiles(y, cumy_right, thresh); 
   
   plt.figure();
   Itot = np.sum(inty_right)+np.sum(inty_left);
-  plt.plot(x,np.cumsum(inty_right)*dx);
-  plt.plot(x,np.cumsum(inty_left)*dx)
+  plt.plot(y,cumy_right);
+  plt.plot(y,cumy_left)
   
-  print
