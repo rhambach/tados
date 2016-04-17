@@ -159,16 +159,16 @@ class ToleranceSystem(object):
   # Wrapper for simulating ZEMAX operands follow
   def TTHI(self,surf,adjust_surf,val):
     return self.change_thickness(surf,adjust_surf=adjust_surf,value=val);
-  def TEDX(self,firstSurf,lastSurf,val):
-    return self.tilt_decenter_elements(firstSurf,lastSurf,xdec=val)
-  def TEDY(self,firstSurf,lastSurf,val):
-    return self.tilt_decenter_elements(firstSurf,lastSurf,ydec=val)
-  def TETX(self,firstSurf,lastSurf,val):
-    return self.tilt_decenter_elements(firstSurf,lastSurf,xtilt=val)
-  def TETY(self,firstSurf,lastSurf,val):
-    return self.tilt_decenter_elements(firstSurf,lastSurf,ytilt=val)
-  def TETZ(self,firstSurf,lastSurf,val):
-    return self.tilt_decenter_elements(firstSurf,lastSurf,ztilt=val)
+  def TEDX(self,firstSurf,lastSurf,val,**kwargs):
+    return self.tilt_decenter_elements(firstSurf,lastSurf,xdec=val,**kwargs)
+  def TEDY(self,firstSurf,lastSurf,val,**kwargs):
+    return self.tilt_decenter_elements(firstSurf,lastSurf,ydec=val,**kwargs)
+  def TETX(self,firstSurf,lastSurf,val,**kwargs):
+    return self.tilt_decenter_elements(firstSurf,lastSurf,xtilt=val,**kwargs)
+  def TETY(self,firstSurf,lastSurf,val,**kwargs):
+    return self.tilt_decenter_elements(firstSurf,lastSurf,ytilt=val,**kwargs)
+  def TETZ(self,firstSurf,lastSurf,val,**kwargs):
+    return self.tilt_decenter_elements(firstSurf,lastSurf,ztilt=val,**kwargs)
 
 
 if __name__ == '__main__':

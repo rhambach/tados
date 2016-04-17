@@ -38,7 +38,17 @@ def find_quantiles(x,F, thresh):
   dx=x[1]-x[0];  
   # offset by half bin width necessary, to have same results if x and F are reversed  
   return np.interp([thresh, F[-1]-thresh],F,x+dx/2); 
-  
+ 
+def compensator_rotz(tol,angle):  
+  " apply rotation of slicer about surface nomal by given angle [deg]"
+  ln = tol.ln; 
+  tol.tilt_decenter_elements(6,8,ztilt=angle,cbComment1="compensator",cbComment2="~compensator");
+  surf = tol.get_orig_surface(20);
+  assert ln.zGetComment(surf)=="rotate image plane";
+  # correct rotation of image plane
+  angle_img = 90+np.rad2deg(np.arctan(np.sqrt(2)*np.tan(np.deg2rad(-22.20765+angle))));
+  ln.zSetSurfaceParameter(surf,5,angle_img);   #  5: TILT ABOUT Z 
+  ln.zPushLens(); 
   
   
 logging.basicConfig(level=logging.INFO);
@@ -56,7 +66,11 @@ with DDElinkHandler() as hDDE:
   wavenum  = 3;
   
   # disturb system (tolerancing)
-  tol.change_thickness(4,12,value=2);     # shift of pupil slicer
+  tol.change_thickness(4,11,value=2);     # shift of pupil slicer
+  
+  # compensator: rotate slicer around surface normal
+  compensator_rotz(tol,3)
+
   #tol.tilt_decenter_elements(1,3,ydec=0.02);  # [mm]
   #tol.TETX(1,3,2.001) # [deg]
   tol.print_current_geometric_changes();

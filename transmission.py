@@ -178,8 +178,11 @@ class RectImageDetector(Detector):
     return yaxis,yprofile;
     
 class PolarImageDetector(Detector):    
-  "2D Image Detector with polar coordinates"
-
+  """
+  2D Image Detector with polar coordinates
+  Todo: correct coordinates of pixels to coincide with center 
+  (rmax denotes extent, i.e, pixel edge, while coordinates refer to pixel centers)
+  """
   def __init__(self, rmax=1, nrings=100):
     """
      rmax ... radial size of detector in image space
