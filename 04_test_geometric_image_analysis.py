@@ -48,7 +48,7 @@ with DDElinkHandler() as hDDE:
   # load example file
   #filename = os.path.join(ln.zGetPath()[1], 'Sequential', 'Objectives', 
   #                        'Cooke 40 degree field.zmx')
-  filename= os.path.realpath('./tests/pupil_slicer.ZMX');
+  filename= os.path.realpath('../13_catalog_optics_1mm_pupil_inf-inf-relay_point_source_with_slicer_tolerancing.ZMX');
   tol=ToleranceSystem(hDDE,filename)
 
   # raytrace parameters for image intensity before aperture
@@ -56,9 +56,9 @@ with DDElinkHandler() as hDDE:
   wavenum  = 3;
   
   # disturb system (tolerancing)
-  tol.change_thickness(5,12,value=2); # shift of pupil slicer
-  tol.tilt_decenter_elements(1,3,ydec=0.02);  # [mm]
-  tol.TETX(1,3,2.001) # [deg]
+  tol.change_thickness(4,12,value=2);     # shift of pupil slicer
+  #tol.tilt_decenter_elements(1,3,ydec=0.02);  # [mm]
+  #tol.TETX(1,3,2.001) # [deg]
   tol.print_current_geometric_changes();
   
   # geometric image analysis

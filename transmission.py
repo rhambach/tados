@@ -85,8 +85,10 @@ class RectImageDetector(Detector):
     self.pixels = np.asarray(pixels);
     # cartesian sampling 
     xmax,ymax = self.extent/2.; nx,ny = self.pixels;    
-    x = np.linspace(-xmax,xmax,nx);  
-    y = np.linspace(-ymax,ymax,ny);
+    xbins = np.linspace(-xmax,xmax,nx+1);         # edges of nx pixels  
+    ybins = np.linspace(-ymax,ymax,ny+1);
+    x = 0.5*(xbins[:-1]+xbins[1:]);               # centers of nx pixels
+    y = 0.5*(ybins[:-1]+ybins[1:]);    
     self.points = np.asarray(np.meshgrid(x,y,indexing='ij')); # shape: (2,numx,numy)
     self.intensity = np.zeros(self.pixels);                   # shape: (numx,numy)
 
@@ -121,7 +123,7 @@ class RectImageDetector(Detector):
     fig,(ax1,ax2)= plt.subplots(2);
     ax1.set_title("footprint in image plane");
     ax1.imshow(intensity.T,origin='lower',aspect='auto',interpolation='hanning',
-             extent=[x[0],x[-1],y[0],y[-1]]);
+             extent=np.outer(self.extent,[-0.5,0.5]).flatten());
     # projections    
     ax2.set_title("projected intensity in image plane");    
     ax2.plot(x,xprofile,label="along x");
