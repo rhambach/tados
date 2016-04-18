@@ -106,7 +106,7 @@ with DDElinkHandler() as hDDE:
     tol.reset();
     tol.change_thickness(4,11,value=2);     # shift of pupil slicer
     decenter_L1(tol,xscale=0,yscale=1);
-    decenter_L1surf3(tol,xscale=0,yscale=1);
+    decenter_L1surf3(tol,xscale=-1,yscale=1);
     tilt_obj(tol,yscale=1)
     
     # update changes

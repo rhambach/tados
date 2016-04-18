@@ -122,7 +122,7 @@ class ToleranceSystem(object):
     surfNum = self.__real2all[surf];              # calculate real surface indices 
     def apply_surf_parameter(surfNum,code,value): # local help function
       if value==0: return  # do nothing
-      assert self.ln.zGetSurfaceData(surfNum,self.ln.SDAT_DCNTR_X_BEFORE)==0; # decenter / tilt must be 0 before
+      assert self.ln.zGetSurfaceData(surfNum,code)==0; # decenter / tilt must be 0 before
       self.ln.zSetSurfaceData(surfNum,code,value);   
     apply_surf_parameter(surfNum,self.ln.SDAT_DCNTR_X_BEFORE,xdec);
     apply_surf_parameter(surfNum,self.ln.SDAT_DCNTR_Y_BEFORE,ydec);
