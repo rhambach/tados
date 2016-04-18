@@ -67,10 +67,6 @@ def compensator_rotz(tol,angle):
   # correct rotation of image plane
   angle_img = 90+np.rad2deg(np.arctan(np.sqrt(2)*np.tan(np.deg2rad(-22.20765+angle))));
   ln.zSetSurfaceParameter(surf,5,angle_img);   #  5: TILT ABOUT Z 
-  ln.zPushLens(); 
-  
-
-
 
   
 logging.basicConfig(level=logging.INFO);
@@ -109,7 +105,7 @@ with DDElinkHandler() as hDDE:
     
     # compensator: rotate slicer around surface normal
     if rotz<>0: compensator_rotz(tol,rotz);
-  
+    tol.ln.zPushLens(1);  
     # geometric image analysis
     img,params = GeometricImageAnalysis(hDDE);
 #    if rotz==0: 

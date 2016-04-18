@@ -134,7 +134,7 @@ class ToleranceSystem(object):
     #         2 for reverse current surface; 3 for pickup previous surface; 
     #         4 for reverse previous surface, etc.
     self.ln.zSetSurfaceData(surfNum,self.ln.SDAT_TILT_DCNTR_STAT_AFTER,2); # reverse current surface
-    
+    self.ln.zGetUpdate();    
     
   def tilt_decenter_elements(self,firstSurf,lastSurf,**kwargs):
     """
@@ -152,10 +152,8 @@ class ToleranceSystem(object):
       raise RuntimeError("Elements (surface ranges) are not allowed to overlap in tolerancing.");
     added_surf = self.ln.zTiltDecenterElements(s1,s2,**kwargs);
     self.__register_dummy_surfaces(added_surf);
-    ret = self.ln.zPushLens(1);
-    if ret==0:  return added_surf;
-    else: return ret;
-
+    return added_surf;
+    
   def change_thickness(self,surf=0,adjust_surf=0,value=0):
     """
     Wrapper for TTHI operand. Change thickness of given surface by a given value 
@@ -177,7 +175,8 @@ class ToleranceSystem(object):
     if adjust_surf>surf:  
       t2=self.ln.zGetThickness(s2);
       self.ln.zSetThickness(s2,value=t2-value);
-    return self.ln.zPushLens(1);
+    self.ln.zGetUpdate();  
+
 
   # Wrapper for simulating ZEMAX operands follow
   def TTHI(self,surf,adjust_surf,val):
@@ -210,6 +209,8 @@ if __name__ == '__main__':
     tol.TETX(1,3,0.001)
     tol.TTHI(1,2,0.01)
     tol.print_current_geometric_changes();
+    
+    tol.ln.zPushLens(1); # show changes also in Zemax LDE
     #  changes to system by hand:
     #
     #  ln.zSetSurfaceData(surfNum=5, code=ln.SDAT_THICK, value=2);

@@ -59,6 +59,7 @@ def __test_tolerancing(tol):
   tol.tilt_decenter_elements(1,3,ydec=0.02);  # [mm]
   tol.TETX(1,3,2.001) # [deg]
   tol.print_current_geometric_changes();
+  tol.ln.zPushLens(1);  
   
   # run Transmission calculation
   T = Transmission(field_sampling,pupil_sampling,raytrace,[dbg,img]);

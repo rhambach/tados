@@ -67,7 +67,6 @@ def compensator_rotz(tol,angle):
   # correct rotation of image plane
   angle_img = 90+np.rad2deg(np.arctan(np.sqrt(2)*np.tan(np.deg2rad(-22.20765+angle))));
   ln.zSetSurfaceParameter(surf,5,angle_img);   #  5: TILT ABOUT Z 
-  ln.zPushLens(); 
   
 
 
@@ -89,8 +88,13 @@ with DDElinkHandler() as hDDE:
 
   # define list of tolerances:
   tolerances = [];
+  def tilt_obj(tol,xscale=0,yscale=0):   # tilt by ~6 deg
+    if xscale<>0: tol.ln.zSetSurfaceParameter(0,1,xscale*0.1)   # set Param1: X TANGENT
+    if yscale<>0: tol.ln.zSetSurfaceParameter(0,2,yscale*0.1)   # set Param1: X TANGENT 
+    tol.ln.zGetUpdate();  
   def decenter_L1(tol,xscale=0,yscale=0):   # x,y are normalized coords !
-    tol.tilt_decenter_elements(1,3,xdec=0.02*xscale,ydec=0.02*yscale,cbComment1="decenter L1", cbComment2="~decenter L1");
+    tol.tilt_decenter_elements(1,3,xdec=0.02*xscale,ydec=0.02*yscale,
+                               cbComment1="decenter L1", cbComment2="~decenter L1");
   def decenter_L1surf3(tol,xscale=0,yscale=0): 
     tol.tilt_decenter_surface(3,xdec=0.02*xscale,ydec=0.02*yscale);
 
@@ -101,10 +105,13 @@ with DDElinkHandler() as hDDE:
     # disturb system (tolerancing)
     tol.reset();
     tol.change_thickness(4,11,value=2);     # shift of pupil slicer
-    decenter_L1(tol,xscale=-1,yscale=1);
+    decenter_L1(tol,xscale=0,yscale=1);
     decenter_L1surf3(tol,xscale=0,yscale=1);
+    tilt_obj(tol,yscale=1)
     
-    tol.TETX(1,3,.001) # [deg]
+    # update changes
+    tol.ln.zPushLens(1);    
+    
     if rotz==0: tol.print_current_geometric_changes();
     
     # compensator: rotate slicer around surface normal
