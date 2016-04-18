@@ -113,6 +113,28 @@ class ToleranceSystem(object):
       if comment[s]: print "  (%s)"%(comment[s]);
       else: print ""
     
+  def tilt_decenter_surface(self,surf,xdec=0.0,ydec=0.0,xtilt=0.0,ytilt=0.0,ztilt=0.0,order=0):
+    """
+    Wrapper for pyzDDE.zSetSurfaceData. The function tilts/decenters single surface
+    by changing the surface data. Assumes that surface is unchanged before.
+    """    
+    #
+    surfNum = self.__real2all[surf];              # calculate real surface indices 
+    def apply_surf_parameter(surfNum,code,value): # local help function
+      if value==0: return  # do nothing
+      assert self.ln.zGetSurfaceData(surfNum,self.ln.SDAT_DCNTR_X_BEFORE)==0; # decenter / tilt must be 0 before
+      self.ln.zSetSurfaceData(surfNum,code,value);   
+    apply_surf_parameter(surfNum,self.ln.SDAT_DCNTR_X_BEFORE,xdec);
+    apply_surf_parameter(surfNum,self.ln.SDAT_DCNTR_Y_BEFORE,ydec);
+    apply_surf_parameter(surfNum,self.ln.SDAT_TILT_X_BEFORE,xtilt);
+    apply_surf_parameter(surfNum,self.ln.SDAT_TILT_Y_BEFORE,ytilt);
+    apply_surf_parameter(surfNum,self.ln.SDAT_TILT_Z_BEFORE,ztilt);
+    apply_surf_parameter(surfNum,self.ln.SDAT_TILT_DCNTR_ORD_BEFORE,order);
+    # After status. 0 for explicit; 1 for pickup current surface; 
+    #         2 for reverse current surface; 3 for pickup previous surface; 
+    #         4 for reverse previous surface, etc.
+    self.ln.zSetSurfaceData(surfNum,self.ln.SDAT_TILT_DCNTR_STAT_AFTER,2); # reverse current surface
+    
     
   def tilt_decenter_elements(self,firstSurf,lastSurf,**kwargs):
     """

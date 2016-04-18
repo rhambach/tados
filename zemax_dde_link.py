@@ -129,7 +129,8 @@ class DDElinkHandler(object):
     ret = self.link.zGetTextFile(textFileName,'Ima',timeout=timeout);
     assert ret == 0, 'zGetTextFile() returned error code {}'.format(ret) 
     lines = pyz._readLinesFromFile(pyz._openFile(textFileName))
-    assert(lines[0]=="Image analysis histogram listing");  # expect output of Image analysis
+    print lines[0]
+    assert(lines[0]=='Image analysis histogram listing');  # expect output of Image analysis
     
     # scan header
     last_line_header = pyz._getFirstLineOfInterest(lines,'Units');

@@ -87,14 +87,24 @@ with DDElinkHandler() as hDDE:
   image_surface = 22;
   wavenum  = 3;
 
+  # define list of tolerances:
+  tolerances = [];
+  def decenter_L1(tol,xscale=0,yscale=0):   # x,y are normalized coords !
+    tol.tilt_decenter_elements(1,3,xdec=0.02*xscale,ydec=0.02*yscale,cbComment1="decenter L1", cbComment2="~decenter L1");
+  def decenter_L1surf3(tol,xscale=0,yscale=0): 
+    tol.tilt_decenter_surface(3,xdec=0.02*xscale,ydec=0.02*yscale);
+
+
   
-  for rotz in (0,1,2,3,4):
+  for rotz in (0,2):
 
     # disturb system (tolerancing)
     tol.reset();
     tol.change_thickness(4,11,value=2);     # shift of pupil slicer
-    #tol.tilt_decenter_elements(1,3,ydec=0.02);  # [mm]
-    #tol.TEX(1,3,.001) # [deg]
+    decenter_L1(tol,xscale=-1,yscale=1);
+    decenter_L1surf3(tol,xscale=0,yscale=1);
+    
+    tol.TETX(1,3,.001) # [deg]
     if rotz==0: tol.print_current_geometric_changes();
     
     # compensator: rotate slicer around surface normal
@@ -102,7 +112,8 @@ with DDElinkHandler() as hDDE:
   
     # geometric image analysis
     img,params = GeometricImageAnalysis(hDDE);
-    if rotz==0: fig = img.show();
+#    if rotz==0: 
+    fig = img.show();
     
   
     # analyze img detector in detail (left and right sight separately)
@@ -129,14 +140,14 @@ with DDElinkHandler() as hDDE:
     cumy       = cumy_right+cumy_left;
     
     # find intensity in box of given width along y
-    y_boxy,I_boxy = intensity_in_box(y,cumy,min_width=0.03,max_width=0.04);
+    y_boxy,I_boxy = intensity_in_box(y,cumy,min_width=0.02,max_width=0.04);
   
     # same for x-direction
     cumx = np.cumsum(intx_left+intx_right)*dx;
     x_boxx,I_boxx = intensity_in_box(x,cumx,min_width=0.120);
   
     # where is loss 1mW ?
-    thresh = [0.001, 0.01];  # [W]
+    thresh = [0.001, 0.01, 0.02, 0.05, 0.07, 0.10];  # [W]
     print rotz,int_tot,thresh;
     print find_quantiles(y_boxy, I_boxy, thresh)[1]; 
     print find_quantiles(x_boxx, I_boxx, thresh)[1];
