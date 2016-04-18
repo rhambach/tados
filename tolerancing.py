@@ -154,6 +154,23 @@ class ToleranceSystem(object):
     self.__register_dummy_surfaces(added_surf);
     return added_surf;
     
+  def insert_coordinate_break(self,surf,**kwargs):
+    """
+    Wrapper for pyzDDE.zInsertCoordinateBreak(self, surfNum, xdec=0.0, ydec=0.0, 
+      xtilt=0.0, ytilt=0.0,ztilt=0.0, order=0, thick=None, comment=None)
+    This function tilts/decenters the coordinate system in front of a given surface
+    
+    returns surface number of added surface
+    """
+    # calculate real surface indices and check, that there are no
+    # coordinate breaks or dummy surfaces between these
+    numSurf = self.__real2all[surf]; 
+    self.ln.zInsertCoordinateBreak(numSurf,**kwargs);
+    self.__register_dummy_surfaces([numSurf]);
+    self.ln.zGetUpdate()
+    return numSurf;
+    
+    
   def change_thickness(self,surf=0,adjust_surf=0,value=0):
     """
     Wrapper for TTHI operand. Change thickness of given surface by a given value 
@@ -208,6 +225,7 @@ if __name__ == '__main__':
     tol.tilt_decenter_elements(1,3,ydec=0.02);  # [mm]
     tol.TETX(1,3,0.001)
     tol.TTHI(1,2,0.01)
+    tol.insert_coordinate_break(10,xdec=-0.01,comment="new CB")
     tol.print_current_geometric_changes();
     
     tol.ln.zPushLens(1); # show changes also in Zemax LDE

@@ -88,17 +88,37 @@ with DDElinkHandler() as hDDE:
 
   # define list of tolerances:
   tolerances = [];
-  def tilt_obj(tol,xscale=0,yscale=0):   # tilt by ~6 deg
-    if xscale<>0: tol.ln.zSetSurfaceParameter(0,1,xscale*0.1)   # set Param1: X TANGENT
-    if yscale<>0: tol.ln.zSetSurfaceParameter(0,2,yscale*0.1)   # set Param1: X TANGENT 
-    tol.ln.zGetUpdate();  
-  def decenter_L1(tol,xscale=0,yscale=0):   # x,y are normalized coords !
-    tol.tilt_decenter_elements(1,3,xdec=0.02*xscale,ydec=0.02*yscale,
+  
+  def tilt_obj(tol,xscale=0,yscale=0):   
+    tilt=np.tan(np.deg2rad(5)); # tilt by 5 deg
+    if xscale<>0: tol.ln.zSetSurfaceParameter(0,1,tilt*xscale)   # set Param1: X TANGENT
+    if yscale<>0: tol.ln.zSetSurfaceParameter(0,2,tilt*yscale)   # set Param1: X TANGENT 
+    tol.ln.zGetUpdate(); 
+    
+  def decenter_L1(tol,xscale=0,yscale=0): 
+    dcntr=0.020;  # [mm]
+    tol.tilt_decenter_elements(1,3,xdec=dcntr*xscale,ydec=dcntr*yscale,
                                cbComment1="decenter L1", cbComment2="~decenter L1");
+
+  def tilt_L1(tol,xscale=0,yscale=0): 
+    tilt=np.rad2deg(0.001); # [rad]
+    tol.tilt_decenter_elements(1,3,xtilt=tilt*xscale,ytilt=tilt*yscale,
+                               cbComment1="tilt L1", cbComment2="~tilt L1");
+
   def decenter_L1surf3(tol,xscale=0,yscale=0): 
-    tol.tilt_decenter_surface(3,xdec=0.02*xscale,ydec=0.02*yscale);
+    dcntr=0.007; # [mm]
+    tol.tilt_decenter_surface(3,xdec=dcntr*xscale,ydec=dcntr*yscale);
 
+  def decenter_F1L1(tol,xscale=0,yscale=0):
+    dcntr=0.020;  # [mm]
+    tol.insert_coordinate_break(4,xdec=dcntr*xscale,ydec=dcntr*yscale,comment="decenter F1L1");
 
+  def tilt_F1L1(tol,xscale=0,yscale=0):
+    tilt=np.rad2deg(0.001); # [rad]
+    tol.insert_coordinate_break(4,xdec=tilt*xscale,ydec=tilt*yscale,comment="tilt F1L1");
+
+  
+  
   
   for rotz in (0,2):
 
@@ -108,6 +128,8 @@ with DDElinkHandler() as hDDE:
     decenter_L1(tol,xscale=0,yscale=1);
     decenter_L1surf3(tol,xscale=-1,yscale=1);
     tilt_obj(tol,yscale=1)
+    decenter_F1L1(tol,yscale=1);
+    tilt_F1L1(tol,yscale=1);
     
     # update changes
     tol.ln.zPushLens(1);    
