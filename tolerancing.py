@@ -16,7 +16,8 @@ class ToleranceSystem(object):
     self.ln = hDDE.link;
     self.filename=filename;
     self.reset();
-        
+    # initial orientation and position of each surface
+    self.__R0, self.__t0 = self.__get_surface_coordinates();        
       
   def reset(self):
     " reset system to original state"
@@ -28,7 +29,7 @@ class ToleranceSystem(object):
     self.__isRealSurf = np.ones(self.numSurf,dtype=bool);
     self.__real2all = np.arange(self.numSurf);
     self.__all2real = np.arange(self.numSurf);    
-    self.__R0, self.__t0 = self.__get_surface_coordinates();
+
 
   def get_orig_surface(self,orig_surface_index):
     """
