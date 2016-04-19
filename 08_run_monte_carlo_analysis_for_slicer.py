@@ -106,7 +106,7 @@ def decenter_F1L1(tol,xscale=0,yscale=0):
 
 def tilt_F1L1(tol,xscale=0,yscale=0):
   tilt=np.rad2deg(0.001); # [rad]
-  tol.insert_coordinate_break(4,xdec=tilt*xscale,ydec=tilt*yscale,comment="tilt F1L1");
+  tol.insert_coordinate_break(4,xtilt=tilt*xscale,ytilt=tilt*yscale,comment="tilt F1L1");
   return tilt*xscale,tilt*yscale
 
 def decenter_L3(tol,xscale=0,yscale=0): 
@@ -128,7 +128,7 @@ def decenter_F2L3(tol,xscale=0,yscale=0):
 
 def tilt_F2L3(tol,xscale=0,yscale=0):
   tilt=np.rad2deg(0.001); # [rad]
-  tol.insert_coordinate_break(17,xdec=tilt*xscale,ydec=tilt*yscale,comment="tilt F2L3");  
+  tol.insert_coordinate_break(17,xtilt=tilt*xscale,ytilt=tilt*yscale,comment="tilt F2L3");  
   return tilt*xscale,tilt*yscale
 
 def decenter_L2(tol,xscale=0,yscale=0): 
@@ -164,7 +164,17 @@ def tilt_slicer(tol,xscale=0,yscale=0):
   tilt=np.rad2deg(0.001); # [rad]
   tol.tilt_decenter_elements(6,8,xtilt=tilt*xscale,ytilt=tilt*yscale,
                              cbComment1="tilt slicer", cbComment2="~tilt slicer");
-  return tilt*xscale,tilt*yscale                         
+  return tilt*xscale,tilt*yscale  
+
+def tilt_F1(tol,xscale=0,yscale=0):
+  tilt=np.rad2deg(0.001); # [rad]
+  tol.insert_coordinate_break(1,xtilt=tilt*xscale,ytilt=tilt*yscale,comment="tilt F1");  
+  return tilt*xscale,tilt*yscale
+
+def tilt_F2(tol,xscale=0,yscale=0):
+  tilt=np.rad2deg(0.001); # [rad]
+  tol.insert_coordinate_break(20,xtilt=tilt*xscale,ytilt=tilt*yscale,comment="tilt F1");  
+  return tilt*xscale,tilt*yscale             
  
 logging.basicConfig(level=logging.ERROR);
 
@@ -177,22 +187,25 @@ with DDElinkHandler() as hDDE:
   tol=ToleranceSystem(hDDE,filename)
 
   # define list of tolerances:
-  tolerances = [tilt_obj,
-                tilt_img,
-                decenter_L1, 
-                tilt_L1,
-                decenter_L1surf3, 
-                decenter_F1L1,
-                tilt_F1L1,
-                decenter_L3,
-                tilt_L3,
-                decenter_F2L3,
-                tilt_F2L3,
-                decenter_L2,
-                tilt_L2,
-                tilt_M1,
-                tilt_M2,
-                tilt_slicer];
+  tolerances = [
+               # tilt_obj,
+               # tilt_img,
+               # decenter_L1, 
+               # tilt_L1,
+               # decenter_L1surf3, 
+               # decenter_F1L1,
+               # tilt_F1L1,
+               # decenter_L3,
+               # tilt_L3,
+               # decenter_F2L3,
+               # tilt_F2L3,
+               # decenter_L2,
+               # tilt_L2,
+               # tilt_M1,
+               # tilt_M2,
+               # tilt_slicer,
+                tilt_F1,
+                 ];
 
   # loop over monte-carlo trials
   np.random.seed(22)  
@@ -207,7 +220,7 @@ with DDElinkHandler() as hDDE:
     save['img']=[];
     save['params']=[];
     # loop over compensator rotations
-    for rotz in (0,0.5,1,2):
+    for rotz in (0,):#0.5,1,2):
       save['rotz'].append(rotz);
       # restore undisturbed system
       tol.reset();
@@ -217,7 +230,7 @@ with DDElinkHandler() as hDDE:
       # disturb system
       for n,disturb_lens in enumerate(tolerances):
         xs,ys = disturb_lens(tol,xscale=randn[n,0],yscale=randn[n,1]);
-        #print "tolerance '%20s': dx=%8.5f, dy=%8.5f"%(disturb_lens.func_name,xs,ys)
+        print "tolerance '%20s': dx=%8.5f, dy=%8.5f, dr=%8.5f"%(disturb_lens.func_name,xs,ys,np.linalg.norm((xs,ys)))
          
       # update changes
       tol.ln.zPushLens(1);    
@@ -240,8 +253,8 @@ with DDElinkHandler() as hDDE:
       I_tot = np.sum(inty)*dy; # [W]
       print '  rotz: %5.3f, I_tot: %5.3f W'%(rotz,I_tot);
       
-    with open(outfile,'wb') as OUT:
-      pickle.dump(save,OUT);
+    #with open(outfile,'wb') as OUT:
+    #  pickle.dump(save,OUT);
     
   """
     OLD CODE:

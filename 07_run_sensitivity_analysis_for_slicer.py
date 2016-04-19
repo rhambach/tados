@@ -72,62 +72,75 @@ def tilt_obj(tol,xscale=0,yscale=0):
   if xscale<>0: tol.ln.zSetSurfaceParameter(0,1,tilt*xscale)   # set Param1: X TANGENT
   if yscale<>0: tol.ln.zSetSurfaceParameter(0,2,tilt*yscale)   # set Param1: X TANGENT 
   tol.ln.zGetUpdate(); 
+  return tilt*xscale,tilt*yscale
   
 def tilt_img(tol,xscale=0,yscale=0):   
   tilt=np.tan(0.001); # tilt by 1 mrad
   if xscale<>0: tol.ln.zSetSurfaceParameter(-1,1,tilt*xscale)   # set Param1: X TANGENT
   if yscale<>0: tol.ln.zSetSurfaceParameter(-1,2,tilt*yscale)   # set Param1: X TANGENT 
   tol.ln.zGetUpdate(); 
+  return tilt*xscale,tilt*yscale
   
 def decenter_L1(tol,xscale=0,yscale=0): 
   dcntr=0.020;  # [mm]
   tol.tilt_decenter_elements(1,3,xdec=dcntr*xscale,ydec=dcntr*yscale,
                              cbComment1="decenter L1", cbComment2="~decenter L1");
+  return dcntr*xscale,dcntr*yscale
 
 def tilt_L1(tol,xscale=0,yscale=0): 
   tilt=np.rad2deg(0.001); # [rad]
   tol.tilt_decenter_elements(1,3,xtilt=tilt*xscale,ytilt=tilt*yscale,
                              cbComment1="tilt L1", cbComment2="~tilt L1");
-
+  return tilt*xscale,tilt*yscale
+  
 def decenter_L1surf3(tol,xscale=0,yscale=0): 
   dcntr=0.007; # [mm]
   tol.tilt_decenter_surface(3,xdec=dcntr*xscale,ydec=dcntr*yscale);
+  return dcntr*xscale,dcntr*yscale
 
 def decenter_F1L1(tol,xscale=0,yscale=0):
   dcntr=0.020;  # [mm]
   tol.insert_coordinate_break(4,xdec=dcntr*xscale,ydec=dcntr*yscale,comment="decenter F1L1");
+  return dcntr*xscale,dcntr*yscale
 
 def tilt_F1L1(tol,xscale=0,yscale=0):
   tilt=np.rad2deg(0.001); # [rad]
-  tol.insert_coordinate_break(4,xdec=tilt*xscale,ydec=tilt*yscale,comment="tilt F1L1");
+  tol.insert_coordinate_break(4,xtilt=tilt*xscale,ytilt=tilt*yscale,comment="tilt F1L1");
+  return tilt*xscale,tilt*yscale
 
 def decenter_L3(tol,xscale=0,yscale=0): 
   dcntr=0.020;  # [mm]
   tol.tilt_decenter_elements(17,19,xdec=dcntr*xscale,ydec=dcntr*yscale,
                              cbComment1="decenter L3", cbComment2="~decenter L3");
+  return dcntr*xscale,dcntr*yscale
 
 def tilt_L3(tol,xscale=0,yscale=0): 
   tilt=np.rad2deg(0.001); # [rad]
   tol.tilt_decenter_elements(17,19,xtilt=tilt*xscale,ytilt=tilt*yscale,
                              cbComment1="tilt L3", cbComment2="~tilt L3");
+  return tilt*xscale,tilt*yscale
 
 def decenter_F2L3(tol,xscale=0,yscale=0):
   dcntr=0.020;  # [mm]
   tol.insert_coordinate_break(17,xdec=dcntr*xscale,ydec=dcntr*yscale,comment="decenter F2L3");
+  return dcntr*xscale,dcntr*yscale
 
 def tilt_F2L3(tol,xscale=0,yscale=0):
   tilt=np.rad2deg(0.001); # [rad]
-  tol.insert_coordinate_break(17,xdec=tilt*xscale,ydec=tilt*yscale,comment="tilt F2L3");  
+  tol.insert_coordinate_break(17,xtilt=tilt*xscale,ytilt=tilt*yscale,comment="tilt F2L3");  
+  return tilt*xscale,tilt*yscale
 
 def decenter_L2(tol,xscale=0,yscale=0): 
   dcntr=0.020;  # [mm]
   tol.tilt_decenter_elements(13,15,xdec=dcntr*xscale,ydec=dcntr*yscale,
                              cbComment1="decenter L2", cbComment2="~decenter L2");
+  return dcntr*xscale,dcntr*yscale
 
 def tilt_L2(tol,xscale=0,yscale=0): 
   tilt=np.rad2deg(0.005); # [rad]
   tol.tilt_decenter_elements(13,15,xtilt=tilt*xscale,ytilt=tilt*yscale,
                              cbComment1="tilt L2", cbComment2="~tilt L2");
+  return tilt*xscale,tilt*yscale
 
 def tilt_single_mirror(tol,nMirror=1,xscale=0,yscale=0,zscale=0):
   tilt=np.rad2deg(0.005); # [rad]
@@ -138,18 +151,29 @@ def tilt_single_mirror(tol,nMirror=1,xscale=0,yscale=0,zscale=0):
   pos['tiltZ'] += zscale*tilt;
   tol.ln.zSetNSCPositionTuple(numSurf,nMirror,**pos)
   tol.ln.zGetUpdate();
-  
+  return tilt*xscale,tilt*yscale
+
 def tilt_M1(tol,**kwargs):
-  tilt_single_mirror(tol,nMirror=1,**kwargs);
+  return tilt_single_mirror(tol,nMirror=1,**kwargs);
 
 def tilt_M2(tol,**kwargs):
-  tilt_single_mirror(tol,nMirror=2,**kwargs);  
+  return tilt_single_mirror(tol,nMirror=2,**kwargs);  
   
 def tilt_slicer(tol,xscale=0,yscale=0): 
   tilt=np.rad2deg(0.005); # [rad]
   tol.tilt_decenter_elements(6,8,xtilt=tilt*xscale,ytilt=tilt*yscale,
                              cbComment1="tilt slicer", cbComment2="~tilt slicer");
-                             
+  return tilt*xscale,tilt*yscale  
+
+def tilt_F1(tol,xscale=0,yscale=0):
+  tilt=np.rad2deg(0.001); # [rad]
+  tol.insert_coordinate_break(1,xtilt=tilt*xscale,ytilt=tilt*yscale,comment="tilt F1");  
+  return tilt*xscale,tilt*yscale
+
+def tilt_F2(tol,xscale=0,yscale=0):
+  tilt=np.rad2deg(0.001); # [rad]
+  tol.insert_coordinate_break(20,xtilt=tilt*xscale,ytilt=tilt*yscale,comment="tilt F1");  
+  return tilt*xscale,tilt*yscale             
  
 logging.basicConfig(level=logging.INFO);
 
