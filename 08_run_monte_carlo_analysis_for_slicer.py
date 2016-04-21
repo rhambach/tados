@@ -169,9 +169,13 @@ def tilt_slicer(tol,xscale=0,yscale=0):
                              cbComment1="tilt slicer", cbComment2="~tilt slicer");
   return tilt*xscale,tilt*yscale  
 
-def tilt_F1(tol,xscale=0,yscale=0):
-  tilt=np.rad2deg(0.001); # [rad]
+def tilt_F1(tol,xscale=0,yscale=0): # note: pivot of tilt is in the object plane !
+  tilt=np.rad2deg(0.005); # [rad]
+  tObj=tol.ln.zGetSurfaceData(0,tol.ln.SDAT_THICK);
+  tol.ln.zSetSurfaceData(0,tol.ln.SDAT_THICK,0);   # remove object thickness
   tol.insert_coordinate_break(1,xtilt=tilt*xscale,ytilt=tilt*yscale,comment="tilt F1");  
+  tol.ln.zSetSurfaceData(1,tol.ln.SDAT_THICK,tObj);# add object thickness
+  tol.ln.zGetUpdate();
   return tilt*xscale,tilt*yscale
 
 def tilt_F2(tol,xscale=0,yscale=0):
@@ -205,7 +209,7 @@ def slicer_mirror_separation(tol,dscale=0,xscale=0,yscale=0):
 
  
 logging.basicConfig(level=logging.ERROR);
-outpath = os.path.realpath('../05_monte_carlo_simulation_system13_NAall');
+outpath = os.path.realpath('../05_monte_carlo_simulation_system11_NA0178');
 logfile = os.path.join(outpath,'monte_carlo_simulation.txt');  # file for summary of MC simulation
   
 with DDElinkHandler() as hDDE, open(logfile,'w') as OUT:
@@ -213,8 +217,8 @@ with DDElinkHandler() as hDDE, open(logfile,'w') as OUT:
   # load example file
   #filename = os.path.join(ln.zGetPath()[1], 'Sequential', 'Objectives', 
   #                        'Cooke 40 degree field.zmx')
-  filename= os.path.realpath('../13_catalog_optics_1mm_pupil_inf-inf-relay_point_source_with_slicer_tolerancing.ZMX');
-  #filename= os.path.realpath('../12_catalog_optics_1mm_pupil_point_source_with_slicer_tolerancing.ZMX');  
+  #filename= os.path.realpath('../13_catalog_optics_1mm_pupil_inf-inf-relay_point_source_with_slicer_tolerancing.ZMX');
+  filename= os.path.realpath('../11_catalog_optics_1mm_pupil_point_source_with_slicer_tolerancing.ZMX');  
   tol=ToleranceSystem(hDDE,filename)
 
   # define list of tolerances:
