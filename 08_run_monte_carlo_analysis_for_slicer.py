@@ -12,7 +12,8 @@ import os
 from tolerancing import *
 from transmission import RectImageDetector
 from zemax_dde_link import *
-import pickle
+import cPickle as pickle
+import gzip
 
 def GeometricImageAnalysis(hDDE, testFileName=None):
   """
@@ -311,8 +312,9 @@ with DDElinkHandler() as hDDE, open(logfile,'w') as OUT:
                 ('  %8.5f'*len(y_samples)) % tuple(I_boxy_samples));
     # end: for rotz       
     
-    # write pkl-file with computed data
-    with open(pklfile,'wb') as f:
-      pickle.dump(save,f);
+    # write gzipped pkl-file with computed data
+    with gzip.open(pklfile,'wb') as f:
+      protocol=-1;
+      pickle.dump(save,f,protocol);
       
   # end: for it

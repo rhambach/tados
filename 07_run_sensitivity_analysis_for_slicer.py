@@ -12,7 +12,8 @@ import os
 from tolerancing import *
 from transmission import RectImageDetector
 from zemax_dde_link import *
-import pickle
+import cPickle as pickle
+import gzip
 
 def GeometricImageAnalysis(hDDE, testFileName=None):
   """
@@ -211,7 +212,7 @@ def optimal(tol,xscale=0,yscale=0):
   return 0,0;
  
 logging.basicConfig(level=logging.WARNING);
-outpath = os.path.realpath('../04_sensitivity_analysis_system14_NA0178');
+outpath = os.path.realpath('../04_sensitivity_analysis_system11_NA0178');
 logfile = os.path.join(outpath,'sensitivity_analysis.txt');  # file for summary of sensitivity analysis
 
 with DDElinkHandler() as hDDE, open(logfile,'w') as OUT:
@@ -219,8 +220,8 @@ with DDElinkHandler() as hDDE, open(logfile,'w') as OUT:
   # load example file
   #filename = os.path.join(ln.zGetPath()[1], 'Sequential', 'Objectives', 
   #                        'Cooke 40 degree field.zmx')
-  filename= os.path.realpath('../14_catalog_optics_1mm_pupil_inf-inf-relay_point_source_with_slicer_tolerancing.ZMX');
-  #filename= os.path.realpath('../11_catalog_optics_1mm_pupil_point_source_with_slicer_tolerancing.ZMX');  
+  #filename= os.path.realpath('../13_catalog_optics_1mm_pupil_inf-inf-relay_point_source_with_slicer_tolerancing.ZMX');
+  filename= os.path.realpath('../11_catalog_optics_1mm_pupil_point_source_with_slicer_tolerancing.ZMX');  
   tol=ToleranceSystem(hDDE,filename)
 
   # define list of tolerances:
@@ -254,7 +255,7 @@ with DDElinkHandler() as hDDE, open(logfile,'w') as OUT:
   # for each possible disturbation of the optical system
   for itol,disturb_func in enumerate(tolerances):
     disturb_name = disturb_func.func_name;
-    pklfile = os.path.join(outpath,'run%04d_%s.pkl'%(itol,disturb_name));
+    pklfile = os.path.join(outpath,'run%04d_%s.pkz'%(itol,disturb_name));
     if os.path.exists(pklfile): continue;  # do not overwrite existing data
     print pklfile;
     OUT.write('\n-- %10s -----------------------------------------------\n'%disturb_name);
@@ -336,9 +337,10 @@ with DDElinkHandler() as hDDE, open(logfile,'w') as OUT:
      
     # end: for xscale,yscale
      
-    # write pkl-file with computed data
-    with open(pklfile,'wb') as f:
-      pickle.dump(save,f);
+    # write gzipped pkl-file with computed data
+    with gzip.open(pklfile,'wb') as f:
+      protocol=-1;
+      pickle.dump(save,f,protocol);
   
   # end: for disturb_func
 

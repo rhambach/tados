@@ -9,7 +9,8 @@ import numpy as np
 import matplotlib.pylab as plt
 import os
 import glob
-import pickle
+import cPickle as pickle
+import gzip
   
 def find_quantiles(x,F,thresh):
   thresh = np.atleast_1d(thresh); 
@@ -37,14 +38,14 @@ def intensity_in_box(x,F,min_width=None,max_width=None):
   I=np.asarray([np.max(F[n:]-F[:-n]) for n in nBox]);
   return (w,I)
 
-path    = os.path.realpath('../03_test_sensitivity_system_14_NA0178');
-pattern = os.path.join(path,'run*.pkl');
+path    = os.path.realpath('../04_sensitivity_analysis_system13_NA0178');
+pattern = os.path.join(path,'run*.pkz');
 
 for pklfile in sorted(glob.glob(pattern)):
-  # read data from pkl-file    
-  f = open(pklfile,'rb');
+  print('read pklfile: %s'%pklfile); 
+  f = gzip.open(pklfile,'rb');    
   save = pickle.load(f);
-  f.close();
+  f.close();     
   
   disturb_name=save['disturb_name'];
   print('\n-- %10s -----------------------------------------------'%disturb_name);

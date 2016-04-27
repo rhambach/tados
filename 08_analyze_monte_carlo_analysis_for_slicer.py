@@ -10,6 +10,7 @@ import matplotlib.pylab as plt
 import os
 import glob
 import cPickle as pickle
+import gzip
 
 def find_quantiles(x,F,thresh):
   thresh = np.atleast_1d(thresh); 
@@ -38,8 +39,8 @@ def intensity_in_box(x,F,min_width=None,max_width=None):
   return (w,I)
  
 
-path    = os.path.realpath('../05_monte_carlo_simulation_system13_NAall');
-pattern = os.path.join(path,'run*.pkl');
+path    = os.path.realpath('../05_monte_carlo_simulation_system11_NA0178');
+pattern = os.path.join(path,'run*.pkz');
 
 # plot for enboxed energy:
 fig1,_ = plt.subplots(nrows=1,ncols=3,sharey=True,sharex=True);   
@@ -52,11 +53,11 @@ for f in (fig1,fig2): f.axes[0].set_ylabel("transmission loss [W]");
 
 footprint=0; Itot0_list=[];
 for pklfile in sorted(glob.glob(pattern)):
-  # read data from pkl-file    
-  f = open(pklfile,'rb');
+  # read data from gzipped pkl-file
+  print('read pklfile: %s'%pklfile); 
+  f = gzip.open(pklfile,'rb');    
   save = pickle.load(f);
-  f.close();
-  print('read pklfile: %s'%pklfile);    
+  f.close();     
   
   # plot footprint (superimposed for all runs)
   footprint += save['img'][0].get_footprint()[2];    # superimpose rotz=0 footprint for all trials        
