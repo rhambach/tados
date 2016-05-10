@@ -18,9 +18,10 @@ import abc
 import logging
 import numpy as np
 import matplotlib.pylab as plt
-from point_in_triangle import point_in_triangle
-from adaptive_mesh import *
-from zemax_dde_link import *
+
+from PyOptics.illumination.point_in_triangle import point_in_triangle
+from PyOptics.illumination.adaptive_mesh import *
+from PyOptics.zemax.dde_link import *
 
 class Detector(object):
   __metaclass__ = abc.ABCMeta
@@ -131,8 +132,8 @@ class RectImageDetector(Detector):
     ax2.legend(loc=0)
     # total intensity
     dx = x[1]-x[0]; dy = y[1]-y[0];
-    if fMask is None:  
-      assert(np.allclose(np.sum(intensity)*dx*dy, 
+    if fMask is None: 
+      assert(np.allclose(np.nansum(intensity)*dx*dy, 
                         [np.sum(xprofile)*dx,np.sum(yprofile)*dy])); # total power must be the same
     logging.info('total power: %5.3f W'%(np.sum(intensity)*dx*dy)); 
     return fig
@@ -162,7 +163,7 @@ class RectImageDetector(Detector):
     """
     X,Y,intensity = self.get_footprint(fMask);
     xaxis = X[:,0];  yaxis = Y[0,:];  dy = yaxis[1]-yaxis[0]; 
-    xprofile = np.sum(intensity,axis=1)*dy; # integral over y
+    xprofile = np.nansum(intensity,axis=1)*dy; # integral over y
     return xaxis,xprofile;
     
   def y_projection(self,fMask=None):
@@ -174,7 +175,7 @@ class RectImageDetector(Detector):
     """
     X,Y,intensity = self.get_footprint(fMask);
     xaxis = X[:,0];  yaxis = Y[0,:];  dx = xaxis[1]-xaxis[0]; 
-    yprofile = np.sum(intensity,axis=0)*dx; # integral over x  
+    yprofile = np.nansum(intensity,axis=0)*dx; # integral over x  
     return yaxis,yprofile;
     
 class PolarImageDetector(Detector):    

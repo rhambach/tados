@@ -154,6 +154,7 @@ class DDElinkHandler(object):
     data = np.loadtxt(lines[first_line_data:]);
     data = data[::-1].T;                           # reorder data as [x,y]
     totFlux_data = np.sum(data)*imgSize**2/Nx/Ny;
+    print totFlux
     assert (data.shape==(Nx,Ny));                  # correct number of pixels read from file
     assert (abs(1-totFlux_data/totFlux) < 0.001);  # check that total flux is correct within 0.1%
     #plt.figure()  

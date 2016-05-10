@@ -9,15 +9,15 @@ Created on Tue Apr 12 11:45:06 2016
 import numpy as np
 import matplotlib.pylab as plt
 import logging
-from tolerancing import *
-from transmission import *
-from zemax_dde_link import *
 
+from PyOptics.illumination.transmission import *
+from PyOptics.tolerancing.tolerancing import *
+from PyOptics.zemax.dde_link import *
 
 def __test_tolerancing(tol):  
   
   # raytrace parameters for image intensity before aperture
-  image_surface = 22;
+  image_surface = 20;                      # 20: without spider, 21: with spider aperture
   wavenum  = 3;
   def raytrace(params, pupil_points):      # local function for raytrace
     x,y   = params;      
@@ -36,7 +36,7 @@ def __test_tolerancing(tol):
   # sampling should be rational approx. of tan(pi/8), using continued fractions:
   # approx tan(pi/2) = [0;2,2,2,2,....] ~ 1/2, 2/5, 5/12, 12/29, 29/70, 70/169
   # results in samplings: (alwoys denominator-1): 4,11,28,69,168
-  xx,yy=cartesian_sampling(11,11,rmax=2);   # low: 4x4, high: 11x11
+  xx,yy=cartesian_sampling(4,4,rmax=2);   # low: 4x4, high: 11x11
   ind = (np.abs(xx)<=1) & (np.abs(yy)<=1) & \
               (np.abs(xx+yy)<=np.sqrt(2)) & (np.abs(xx-yy)<=np.sqrt(2));
   
@@ -55,7 +55,7 @@ def __test_tolerancing(tol):
   dbg = CheckTriangulationDetector();
 
   # disturb system (tolerancing)
-  tol.change_thickness(5,12,value=2); # shift of pupil slicer
+  tol.change_thickness(4,11,value=2); # shift of pupil slicer
   tol.tilt_decenter_elements(1,3,ydec=0.02);  # [mm]
   tol.TETX(1,3,2.001) # [deg]
   tol.print_current_geometric_changes();
@@ -85,7 +85,7 @@ if __name__ == '__main__':
     # load example file
     #filename = os.path.join(ln.zGetPath()[1], 'Sequential', 'Objectives', 
     #                        'Cooke 40 degree field.zmx')
-    filename= os.path.realpath('./tests/pupil_slicer.ZMX');
+    filename= os.path.realpath('../tests/zemax/pupil_slicer.ZMX');
     tol=ToleranceSystem(hDDE,filename)
     __test_tolerancing(tol);
     

@@ -8,13 +8,16 @@ Created on Tue Apr 12 09:23:26 2016
 import numpy as np
 import matplotlib.pylab as plt
 import logging
-from transmission import *
-from zemax_dde_link import *
+
+from PyOptics.illumination.point_in_triangle import point_in_triangle
+from PyOptics.illumination.transmission import *
+from PyOptics.zemax.dde_link import *
+
 
 def __test_intensity_footprint(hDDE):  
   
   # raytrace parameters
-  image_surface = 24;
+  image_surface = 20;                      # 20: without spider, 21: with spider aperture
   wavenum  = 4;
   def raytrace(params, pupil_points):      # local function for raytrace
     x,y   = params;      
@@ -65,7 +68,7 @@ def __test_intensity_footprint(hDDE):
 
 def __test_angular_distribution(hDDE):
   # raytrace parameters
-  image_surface = 22;
+  image_surface = 20;                      # 20: without spider, 21: with spider aperture
   wavenum  = 4;
   def raytrace(params, field_points):      # local function for raytrace
     px,py = params;      
@@ -118,7 +121,7 @@ if __name__ == '__main__':
     # load example file
     #filename = os.path.join(ln.zGetPath()[1], 'Sequential', 'Objectives', 
     #                        'Cooke 40 degree field.zmx')
-    filename= os.path.realpath('./tests/pupil_slicer.ZMX');
+    filename= os.path.realpath('../tests/zemax/pupil_slicer.ZMX');
     hDDE.load(filename);
     __test_intensity_footprint(hDDE);
     __test_angular_distribution(hDDE);

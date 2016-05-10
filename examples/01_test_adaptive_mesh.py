@@ -9,13 +9,15 @@ from __future__ import division
 import logging
 import numpy as np
 import matplotlib.pylab as plt
-from point_in_triangle import point_in_triangle
-from adaptive_mesh import *
-from zemax_dde_link import *
+
+import _set_pkgdir
+from PyOptics.illumination.point_in_triangle import point_in_triangle
+from PyOptics.illumination.adaptive_mesh import *
+from PyOptics.zemax.dde_link import *
 
 def analyze_transmission(hDDE):  
   # set up ray-trace parameters and image detector
-  image_surface = 22;
+  image_surface = 21;
   wavenum  = 1;
   image_size = np.asarray((0.2,0.05));
   image_size = np.asarray((0.2,0.05));
@@ -113,7 +115,7 @@ if __name__ == '__main__':
     # load example file
     #filename = os.path.join(ln.zGetPath()[1], 'Sequential', 'Objectives', 
     #                        'Cooke 40 degree field.zmx')
-    filename= os.path.realpath('./tests/pupil_slicer.ZMX');
+    filename= os.path.realpath('../tests/zemax/pupil_slicer.ZMX');
     hDDE.load(filename);
     analyze_transmission(hDDE);
     

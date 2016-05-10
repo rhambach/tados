@@ -9,9 +9,11 @@ import numpy as np
 import matplotlib.pylab as plt
 import logging
 import os
-from tolerancing import *
-from transmission import RectImageDetector
-from zemax_dde_link import *
+
+from PyOptics.illumination.transmission import RectImageDetector
+from PyOptics.tolerancing.tolerancing import *
+from PyOptics.zemax.dde_link import *
+
 
 def GeometricImageAnalysis(hDDE, testFileName=None):
   """
@@ -74,8 +76,7 @@ with DDElinkHandler() as hDDE:
   # load example file
   #filename = os.path.join(ln.zGetPath()[1], 'Sequential', 'Objectives', 
   #                        'Cooke 40 degree field.zmx')
-  filename= os.path.realpath('../13_catalog_optics_1mm_pupil_inf-inf-relay_point_source_with_slicer_tolerancing.ZMX');
-  #filename= os.path.realpath('../11_catalog_optics_1mm_pupil_point_source_with_slicer_tolerancing.ZMX');  
+  filename= os.path.realpath('../tests/zemax/pupil_slicer.ZMX');
   tol=ToleranceSystem(hDDE,filename)
 
   # allow for compensators, here rotation about surface normal of slicer
@@ -85,6 +86,7 @@ with DDElinkHandler() as hDDE:
     # shift of pupil slicer
     tol.reset();
     tol.change_thickness(4,11,value=2);
+    tol.ln.zDeleteSurface(21);           # remove spider aperture
     tol.ln.zPushLens(1);    
     if rotz==0: tol.print_current_geometric_changes();
   
@@ -111,7 +113,7 @@ with DDElinkHandler() as hDDE:
     cumy = np.cumsum(inty)*dy;
     
     # find intensity in box of given width along y    
-    x_boxx,I_boxx = intensity_in_box(x,cumx,min_width=0.115,max_width=0.14)
+    x_boxx,I_boxx = intensity_in_box(x,cumx,min_width=0.115,max_width=0.13)
     y_boxy,I_boxy = intensity_in_box(y,cumy,min_width=0.03,max_width=0.04);
   
     # update figure 
