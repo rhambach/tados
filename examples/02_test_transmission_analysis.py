@@ -11,7 +11,7 @@ import logging
 
 from PyOptics.illumination.point_in_triangle import point_in_triangle
 from PyOptics.illumination.transmission import *
-from PyOptics.zemax.dde_link import *
+from PyOptics.zemax import dde_link, sampling
 
 
 def __test_intensity_footprint(hDDE):  
@@ -36,7 +36,7 @@ def __test_intensity_footprint(hDDE):
   # sampling should be rational approx. of tan(pi/8), using continued fractions:
   # approx tan(pi/2) = [0;2,2,2,2,....] ~ 1/2, 2/5, 5/12, 12/29, 29/70, 70/169
   # results in samplings: (alwoys denominator-1): 4,11,28,69,168
-  xx,yy=cartesian_sampling(4,4,rmax=2);   # low: 4x4, high: 11x11
+  xx,yy=sampling.cartesian_sampling(4,4,rmax=2);   # low: 4x4, high: 11x11
   ind = (np.abs(xx)<=1) & (np.abs(yy)<=1) & \
               (np.abs(xx+yy)<=np.sqrt(2)) & (np.abs(xx-yy)<=np.sqrt(2));
   field_sampling = np.vstack((xx[ind],yy[ind])).T;       # size (nFieldPoints,2)
@@ -45,7 +45,7 @@ def __test_intensity_footprint(hDDE):
   plt.xlabel('x'); plt.ylabel('y');
   
   # pupil sampling (circular, adaptive mesh)
-  px,py=fibonacci_sampling_with_circular_boundary(50,20) # low: (50,20), high: (200,50)
+  px,py=sampling.fibonacci_sampling_with_circular_boundary(50,20) # low: (50,20), high: (200,50)
   pupil_sampling = np.vstack((px,py)).T;                 # size (nPoints,2)
   
   # set up image detector
@@ -84,13 +84,13 @@ def __test_angular_distribution(hDDE):
   # sampling should be rational approx. of tan(pi/8), using continued fractions:
   # approx tan(pi/2) = [0;2,2,2,2,....] ~ 1/2, 2/5, 5/12, 12/29, 29/70, 70/169
   # results in samplings: (alwoys denominator-1): 4,11,28,69,168
-  xx,yy=cartesian_sampling(28,28,rmax=2);  # low: 11x11, high: 69x69
+  xx,yy=sampling.cartesian_sampling(28,28,rmax=2);  # low: 11x11, high: 69x69
   ind = (np.abs(xx)<=1) & (np.abs(yy)<=1) & \
               (np.abs(xx+yy)<=np.sqrt(2)) & (np.abs(xx-yy)<=np.sqrt(2));
   field_sampling = np.vstack((xx[ind],yy[ind])).T;       # size (nFieldPoints,2)
   
   # pupil sampling (cartesian grid with circular boundary)
-  px,py=cartesian_sampling(3,3,rmax=1)     # low: 7x7, high: 11x11
+  px,py=sampling.cartesian_sampling(3,3,rmax=1)     # low: 7x7, high: 11x11
   pupil_sampling = np.vstack((px,py)).T;                 # size (nPoints,2)
   plt.figure(); plt.title("pupil sampling (normalized coordinates)");
   plt.plot(px.flat,py.flat,'.')
@@ -115,7 +115,7 @@ if __name__ == '__main__':
   import sys as sys
   logging.basicConfig(level=logging.INFO);
   
-  with DDElinkHandler() as hDDE:
+  with dde_link.DDElinkHandler() as hDDE:
   
     ln = hDDE.link;
     # load example file

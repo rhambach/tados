@@ -13,7 +13,7 @@ import matplotlib.pylab as plt
 import _set_pkgdir
 from PyOptics.illumination.point_in_triangle import point_in_triangle
 from PyOptics.illumination.adaptive_mesh import *
-from PyOptics.zemax.dde_link import *
+from PyOptics.zemax import sampling, dde_link
 
 def analyze_transmission(hDDE):  
   # set up ray-trace parameters and image detector
@@ -22,18 +22,18 @@ def analyze_transmission(hDDE):
   image_size = np.asarray((0.2,0.05));
   image_size = np.asarray((0.2,0.05));
   image_shape = np.asarray((201,501));
-  img_pixels = cartesian_sampling(*image_shape,rmax=2); # shape: (2,nPixels)
+  img_pixels = sampling.cartesian_sampling(*image_shape,rmax=2); # shape: (2,nPixels)
   img_pixels*= image_size[:,np.newaxis]/2;
   image_intensity = np.zeros(np.prod(image_shape)); # 1d array
 
   # field sampling
-  xx,yy=cartesian_sampling(3,3,rmax=.1)  
+  xx,yy=sampling.cartesian_sampling(3,3,rmax=.1)  
   for i in xrange(len(xx)):
     x=xx[i]; y=yy[i];
     print("Field point: x=%5.3f, y=%5.3f"%(x,y))
     
     # init adaptive mesh for pupil sampling☺
-    px,py=fibonacci_sampling_with_circular_boundary(200,2*np.sqrt(500))  
+    px,py=sampling.fibonacci_sampling_with_circular_boundary(200)  
     initial_sampling = np.vstack((px,py)).T;         # size (nPoints,2)
     def raytrace(pupil_points):        # local function for raytrace
       px,py = pupil_points.T;
@@ -106,10 +106,9 @@ def analyze_transmission(hDDE):
 
 if __name__ == '__main__':
   import os as os
-  import sys as sys
   logging.basicConfig(level=logging.INFO);
   
-  with DDElinkHandler() as hDDE:
+  with dde_link.DDElinkHandler() as hDDE:
   
     ln = hDDE.link;
     # load example file

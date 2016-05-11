@@ -21,7 +21,7 @@ import matplotlib.pylab as plt
 
 from PyOptics.illumination.point_in_triangle import point_in_triangle
 from PyOptics.illumination.adaptive_mesh import *
-from PyOptics.zemax.dde_link import *
+from PyOptics.zemax.sampling import *
 
 class Detector(object):
   __metaclass__ = abc.ABCMeta

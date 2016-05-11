@@ -12,7 +12,7 @@ import logging
 
 from PyOptics.illumination.transmission import *
 from PyOptics.tolerancing.tolerancing import *
-from PyOptics.zemax.dde_link import *
+from PyOptics.zemax import dde_link, sampling
 
 def __test_tolerancing(tol):  
   
@@ -36,7 +36,7 @@ def __test_tolerancing(tol):
   # sampling should be rational approx. of tan(pi/8), using continued fractions:
   # approx tan(pi/2) = [0;2,2,2,2,....] ~ 1/2, 2/5, 5/12, 12/29, 29/70, 70/169
   # results in samplings: (alwoys denominator-1): 4,11,28,69,168
-  xx,yy=cartesian_sampling(4,4,rmax=2);   # low: 4x4, high: 11x11
+  xx,yy=sampling.cartesian_sampling(4,4,rmax=2);   # low: 4x4, high: 11x11
   ind = (np.abs(xx)<=1) & (np.abs(yy)<=1) & \
               (np.abs(xx+yy)<=np.sqrt(2)) & (np.abs(xx-yy)<=np.sqrt(2));
   
@@ -46,7 +46,7 @@ def __test_tolerancing(tol):
   plt.xlabel('x'); plt.ylabel('y');
   
   # pupil sampling (circular, adaptive mesh)
-  px,py=fibonacci_sampling_with_circular_boundary(50,20) # low: (50,20), high: (200,50)
+  px,py=sampling.fibonacci_sampling_with_circular_boundary(50,20) # low: (50,20), high: (200,50)
   pupil_sampling = np.vstack((px,py)).T;                 # size (nPoints,2)
   
   # set up image detector
@@ -79,7 +79,7 @@ if __name__ == '__main__':
   import sys as sys
   logging.basicConfig(level=logging.INFO);
   
-  with DDElinkHandler() as hDDE:
+  with dde_link.DDElinkHandler() as hDDE:
   
     ln = hDDE.link;
     # load example file

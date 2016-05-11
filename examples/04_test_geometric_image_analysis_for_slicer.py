@@ -12,7 +12,7 @@ import os
 
 from PyOptics.illumination.transmission import RectImageDetector
 from PyOptics.tolerancing.tolerancing import *
-from PyOptics.zemax.dde_link import *
+from PyOptics.zemax import dde_link
 
 
 def GeometricImageAnalysis(hDDE, testFileName=None):
@@ -71,7 +71,7 @@ def compensator_rotz(tol,angle):
  
 logging.basicConfig(level=logging.WARNING);
 
-with DDElinkHandler() as hDDE:
+with dde_link.DDElinkHandler() as hDDE:
   ln = hDDE.link;
   # load example file
   #filename = os.path.join(ln.zGetPath()[1], 'Sequential', 'Objectives', 
