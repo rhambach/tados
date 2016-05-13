@@ -284,7 +284,7 @@ class Transmission(object):
     
     def is_broken(simplices):
         " local help function for defining which simplices should be subdivided"
-        broken = Mesh.get_broken_triangles(simplices=simplices,lthresh=lthresh);
+        broken = Mesh.find_broken_triangles(simplices=simplices,lthresh=lthresh);
         area_broken = Mesh.get_area_in_domain(simplices=simplices[broken]);
         broken[broken] = (area_broken>Athresh);  # only consider triangles > Athresh as broken
         return broken;
@@ -303,14 +303,14 @@ class Transmission(object):
       # iterative mesh refinement (subdivision of broken triangles)
       while True:  
         if ip==0: # plot mesh for first set of parameters
-          skip = lambda(simplices): Mesh.get_broken_triangles(simplices=simplices,lthresh=lthresh)        
+          skip = lambda(simplices): Mesh.find_broken_triangles(simplices=simplices,lthresh=lthresh)        
           Mesh.plot_triangulation(skip_triangle=skip);
         # refine mesh until nothing changes
         nNew = Mesh.refine_broken_triangles(is_broken,nDivide=100,bPlot=(ip==0));        
         if nNew==0: break 
           
       # update detectors
-      broken = Mesh.get_broken_triangles(lthresh=lthresh);
+      broken = Mesh.find_broken_triangles(lthresh=lthresh);
       for d in self.detectors:
         d.add(Mesh,bSkip=broken,weight=self.weights[ip]);
 

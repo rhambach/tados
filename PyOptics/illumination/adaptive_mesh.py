@@ -2,6 +2,8 @@
 """
 Created on Thu Apr 07 19:23:20 2016
 
+links: http://blancosilva.github.io/post/2014/10/28/Computational-Geometry-in-Python.html
+
 @author: Hambach
 """
 import numpy as np
@@ -110,13 +112,21 @@ class AdaptiveMesh(object):
     return 0.5 * ( (x[1]-x[0])*(y[2]-y[0]) - (x[2]-x[0])*(y[1]-y[0]) );
   
   
-  def get_broken_triangles(self,simplices=None,lthresh=None,):
+  def find_broken_triangles(self,simplices=None,lthresh=None,):
     """
     identify triangles that are cut in image space or include invalid vertices
-      simplices ... (opt) list of simplices, shape (nTriangles,3)  
-      lthresh   ... (opt) threshold for longest side of broken triangle 
-    Returns:
-      1d vector of size nTriangles indicating if triangle is broken
+    
+    Parameters
+    ----------
+      simplices : ndarray of ints, shape (nTriangles,3), optional
+         Indices of the points forming the simplices in the triangulation. 
+      lthresh : float, optional
+         absolute threshold for longest side of broken triangle 
+         
+    Returns
+    -------
+      bBroken: boolean vector of length nTriangles
+         indicates, if triangle is broken
     """
     if simplices is None: simplices = self.simplices;    
     # x and y coordinates for each vertex in each triangle 
@@ -130,17 +140,186 @@ class AdaptiveMesh(object):
     bValid = max_lensq < lthresh**2; 
     return ~bValid;   # Note: differs from (max_lensq >= lthresh**2), if some vertices are invalid!
 
+  def find_skinny_triangles(self,simplices=None,rthresh=5):
+    """
+    Identify triangles that deviate strongly from regular triangle (have very small angles)
+    
+    Parameters
+    ----------
+      simplices : ndarray of ints, shape (nTriangles,3), optional
+         Indices of the points forming the simplices in the triangulation. 
+      rthresh : float, optional
+         relative threshold, specifies, how much smaller (area) a triangle
+         can be compared to the corresponding regular triangle
+         
+    Returns
+    -------
+      bSkinny: boolean vector of length nTriangles
+         indicates, if triangle is skinny
+    """
+    if simplices is None: simplices = self.simplices;    
+    # x and y coordinates for each vertex in each triangle, shape (nTriangles,3,2)
+    triangles = self.image[simplices];
+    # calculate (squared) length of each edge in triangle, shape (nTriangles,3)
+    # (X[0]-X[1])**2 + (Y[0]-Y[1])**2; (X[1]-X[2])**2 + (Y[1]-Y[2])**2, (X[2]-X[0])**2 + (Y[2]-Y[0])**2 
+    lensq = np.sum(np.diff(triangles[:,[0,1,2,0]],axis=1)**2,axis=2)
+    # calculate (signed) area of triangles
+    x,y = triangles.T    
+    area = 0.5 * ( (x[1]-x[0])*(y[2]-y[0]) - (x[2]-x[0])*(y[1]-y[0]) );   
+    # skinny triangles: area of triangle is much smaller (by factor rthresh) 
+    # than the area of regular triangle sqrt(3)/4*maxlensq ~ 0.433*maxlensq
+    bSkinny = np.abs(area) < (0.433/rthresh) * np.nanmax(lensq,axis=1);
+      # note: nan's in area are not catched so far
+      
+    return bSkinny    
+   
+  def refine_skinny_triangles(self,skip_triangle=None,rthresh=5,scale_sampling=0.5,bPlot=False):
+    """
+    subdivide skinny triangles in the image mesh (have very small angles)
+    
+    Parameters
+    ----------
+      skip_triangle: function mask=skip_triangle(simplices), optional
+         function, that accepts a list of simplices of shape (nTriangles, 3) 
+         and returns a flag for each triangle indicating if it is ignored
+      rthresh : float, optional
+         relative threshold, specifies, how much smaller (area) a triangle
+         can be compared to the corresponding regular triangle 
+      scale_sampling : float, optional
+         increasing scale_sampling will increase the number of subdivisions,
+         a typical range is between 0.5 (default) and 1
+      bPlot : boolean
+         if True, the triangulation including the skinny triangles is shown
+    
+    Returns
+    --------
+      number of points added to the triangulation
+    
+    Note
+    ----
+      See Shewchuk, Delaunay Refinement Algorithms for Triangular Mesh Generation
+      http://www.cs.berkeley.edu/~jrs/papers/2dj.pdf
+    
+    """     
+    bSkinny = self.find_skinny_triangles(self.simplices,rthresh=rthresh);
+    if skip_triangle is not None:
+      bSkinny &= ~skip_triangle(self.simplices);
+    if np.sum(bSkinny)==0: return; # nothing to do
+    
+    simplices = self.simplices[bSkinny];                   # shape (nTriangles,3)
+    triangles = self.image[simplices];                     # shape (nTriangles,3,2)
+    nPointsOrigMesh = self.image.shape[0];  
+
+    # find largest side of triangle in image space -> named as CA
+    len_edge = np.sqrt( np.sum(np.diff(triangles[:,[0,1,2,0]],axis=1)**2,axis=2) ); # shape (nTriangles,3)
+    indC = np.argmax(len_edge,axis=1);
+    area = np.abs(self.get_area_in_image(simplices));
+
+    # iterate over all triangles and subdivide them
+    #
+    #   notation for skinny triangle (oriented ccw)
+    #             C .         
+    #              /|           CA: longest side of triangle
+    #             / |           
+    #            /  |
+    #        A  /___| B
+    #      
+    #   subdivision of skinny triangle: 
+    #   we add nCB points along CB, nBA points along BA
+    #   and nCB+nBA+1 points along CA and create new triangles
+    #   as indicated below for nCB=3, nBA=1.
+    #      
+    #          p0     p1     p2     p3     p4     p5
+    #          .______.______.______B______.______A 
+    #         / \    / \    / \    / \    / \    /
+    #        /   \  /   \  /   \  /   \  /   \  /
+    #       C_____\/_____\/_____\/_____\/_____\/  
+    #      q0     q1     q2     q3     q4     q5
+    #      
+    #   New triangles (all oriented ccw): 
+    #     lower triangles: (q_i, q_{i+1}, p_i)     for i=0,...,nCB+nBA
+    #     upper triangles: (p_i, q_{i+1}, p_{i+1}) for i=0,...,nCB+nBA
+    #
+    #   Special case: nCB=0=nBA
+    #     one lower and one upper triangle is created
+
+    new_domain_points=[];
+    new_simplices=[];
+    for k,simplex in enumerate(simplices):    
+      # vertices of simplex in domain space, ordered such that 
+      # edge CA is largest side of triangle in image space
+      vertices = self.domain[simplex];      # shape (3,2);
+      ind_sort = (indC[k]+np.arange(3))%3;  # index array for sorting vertices as C,A,B
+      C,A,B = vertices[ind_sort];
+      ca,ba,cb = len_edge[k,ind_sort];
+      assert ca>=ba and ca>=cb, "unexpected error in naming of skinny triangle"
+      # estimate number of subdivisions (from ratio of heigt h_CA of triangle ABC vs CB and CA)      
+      hCA = 2*area[k]/ca;  
+      nCB = int(np.floor(cb/hCA*0.86*scale_sampling)); # Note: cb>h_CA, i.e. nCB would be always >1 without factor 0.8
+      nBA = int(np.floor(ba/hCA*0.86*scale_sampling)); #       0.86 ~ sqrt(3)/2, height in regular triangle
+      nCA = nCB+nBA+1;
+      #print k,nCB,nBA      
+      # offset for indices of points p and q in list of domain_points
+      p=nPointsOrigMesh + len(new_domain_points);
+      q=nPointsOrigMesh + len(new_domain_points)+nCA+1;         
+      # create new sampling points 
+      for x in np.arange(1,nCB+2)/(nCB+1.):         # [1/n, 2/n, ..., 1], at least [1,]
+        new_domain_points.append((1-x)*C + x*B);    # p0, ..., p_nCB
+      for x in np.arange(1,nBA+2)/(nBA+1.):         # [1/n, 2/n, ..., 1], at least [1,]
+        new_domain_points.append((1-x)*B + x*A);    # p_{nCB+1}, ..., p_nCA
+      for x in np.arange(0,nCA+1)/(nCA+1.):         # [0, 1/n, ..., (n-1)/n], at least [0,0.5]
+        new_domain_points.append((1-x)*C + x*A);    # q_0, ..., q_nCA;
+      # create new simplices (see figure above)
+      new_simplices.extend( [(q+i, q+i+1, p+i  ) for i in xrange(0,nCA)] ); # lower triangles
+      new_simplices.extend( [(p+i, q+i+1, p+i+1) for i in xrange(0,nCA)] ); # upper triangles
+         
+    # update points in mesh (points are no longer unique!)
+    logging.debug("refining_skinny_triangles(): adding %d points"%len(new_domain_points));
+    new_domain_points=np.asarray(new_domain_points);  
+    new_image_points=self.mapping(new_domain_points);
+    self.domain= np.vstack((self.domain,new_domain_points));    
+    self.image = np.vstack((self.image, new_image_points)); 
+    
+   
+    if bPlot:   
+      from matplotlib.collections import PolyCollection
+      fig = self.plot_triangulation();
+      fig.suptitle("DEBUG: refine_skinny_triangles()");
+      ax1,ax2 = fig.axes;
+      params = dict(facecolors='r', edgecolors='none', alpha=0.3);      
+      ax1.add_collection(PolyCollection(self.domain[simplices],**params));      
+      
+      ax2.add_collection(PolyCollection(self.image[simplices],**params));
+      ax2.plot(new_image_points[:,0],new_image_points[:,1],'k.')
+      
+    # sanity check that total area did not change after segmentation
+    old = np.sum(np.abs(self.get_area_in_domain(simplices)));
+    new = np.sum(np.abs(self.get_area_in_domain(new_simplices)));
+    assert(abs((old-new)/old)<1e-10) # segmentation of triangle has no holes/overlaps
+
+    # update list of simplices
+    return self.__add_new_simplices(np.asarray(new_simplices),bSkinny);  
+  
         
   def refine_large_triangles(self,is_large):
     """
     subdivide large triangles in the image mesh
-      is_large ... function mask=is_large(triangles) that accepts a list of 
-                     simplices of shape (nTriangles, 3) and returns a flag 
-                     for each triangle indicating if it should be subdivided
     
-    returns: number of new triangles                 
-    Note: Additional points are added at the center of gravity of large triangles
-          and the Delaunay triangulation is recalculated. Edge flips can occur.
+    Parameters
+    ----------
+      is_large : function, mask=is_large(triangles)
+        function, which accepts a list of simplices of shape (nTriangles, 3) 
+        and returns a flag for each triangle indicating if it should be subdivided
+    
+    Returns
+    --------
+      number of points added to the triangulation                 
+    
+    Note
+    ----
+      Additional points are added at the center of gravity of large triangles
+      and the Delaunay triangulation is recalculated. Edge flips can occur.
+      This procedure is suboptimal, as it produces skinny triangles.
     """
     # check if mesh is still a Delaunay mesh
     if self.__tri is None:
@@ -216,9 +395,8 @@ class AdaptiveMesh(object):
     #       of the triangle, otherwise the partition will fail!     
 
     # identify the shortest edge of the triangle in image space (not cut)
-    vertices = np.concatenate((triangles,triangles[:,[0],:]),axis=1); # shape (nTriangles,4,2)
-    edge_len = np.sum( np.diff(vertices,axis=1)**2, axis=2); # shape (nTriangles,3)
-    min_edge = np.argmin( edge_len,axis=1);                # shape (nTriangles)
+    lensq = np.sum( np.diff(triangles[:,[0,1,2,0]],axis=1)**2, axis=2); # shape (nTriangles,3)
+    min_edge = np.argmin( lensq,axis=1);                                # shape (nTriangles)
  
     # find point as C (opposit to min_edge) and resample CA and CB
     indC = min_edge-1;
