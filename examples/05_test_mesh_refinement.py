@@ -46,7 +46,7 @@ def analyze_transmission(hDDE):
     print("Field point: x=%5.3f, y=%5.3f"%(x,y))
     
     # pupil sampling (circular, adaptive mesh)
-    px,py=sampling.fibonacci_sampling_with_circular_boundary(1500);
+    px,py=sampling.fibonacci_sampling_with_circular_boundary(500);
     pupil_sampling = np.vstack((px,py)).T;                 # size (nPoints,2)  
     mapping = lambda(mesh_points): raytrace((x,y),mesh_points);
     Mesh=AdaptiveMesh(pupil_sampling, mapping);
@@ -56,8 +56,8 @@ def analyze_transmission(hDDE):
     rthresh = 2;
     is_skinny= lambda(simplices): Mesh.find_skinny_triangles(simplices=simplices,rthresh=rthresh);
     Mesh.plot_triangulation(skip_triangle=is_skinny);
-    for it in range(1): 
-      Mesh.refine_skinny_triangles(rthresh=rthresh,scale_sampling=0.5,bPlot=True);
+    for it in range(2): 
+      Mesh.refine_skinny_triangles(rthresh=rthresh,bPlot=True);
     Mesh.plot_triangulation(skip_triangle=is_skinny);
  
     # subdivision of invalid triangles (raytrace failed for some vertices)

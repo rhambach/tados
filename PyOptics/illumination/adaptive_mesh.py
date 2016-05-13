@@ -173,7 +173,11 @@ class AdaptiveMesh(object):
       
     return bSkinny    
    
-  def refine_skinny_triangles(self,skip_triangle=None,rthresh=5,scale_sampling=0.5,bPlot=False):
+
+   
+   
+   
+  def refine_skinny_triangles_complicated(self,skip_triangle=None,rthresh=5,scale_sampling=0.5,bPlot=False):
     """
     subdivide skinny triangles in the image mesh (have very small angles)
     
@@ -197,6 +201,10 @@ class AdaptiveMesh(object):
     
     Note
     ----
+      Artefacts occur at the boundary of the split triangles, if the neighboring
+      triangle is not split (very thin, overlapping triangles). Separation should
+      maybe be done differently (using Delaunay triangulation, just splitting largest side by two☺)
+    
       See Shewchuk, Delaunay Refinement Algorithms for Triangular Mesh Generation
       http://www.cs.berkeley.edu/~jrs/papers/2dj.pdf
     
@@ -300,7 +308,84 @@ class AdaptiveMesh(object):
     # update list of simplices
     return self.__add_new_simplices(np.asarray(new_simplices),bSkinny);  
   
+  
+  def refine_skinny_triangles(self,skip_triangle=None,rthresh=5,scale_sampling=0.5,bPlot=False):
+    """
+    subdivide skinny triangles in the image mesh (have very small angles)
+    
+    Parameters
+    ----------
+      skip_triangle: function mask=skip_triangle(simplices), optional
+         function, that accepts a list of simplices of shape (nTriangles, 3) 
+         and returns a flag for each triangle indicating if it is ignored
+      rthresh : float, optional
+         relative threshold, specifies, how much smaller (area) a triangle
+         can be compared to the corresponding regular triangle 
+      scale_sampling : float, optional
+         increasing scale_sampling will increase the number of subdivisions,
+         a typical range is between 0.5 (default) and 1
+      bPlot : boolean
+         if True, the triangulation including the skinny triangles is shown
+    
+    Returns
+    --------
+      number of points added to the triangulation
+    
+    Note
+    ----
+      ToDo: remove duplicate points !!
+      
+      See Shewchuk, Delaunay Refinement Algorithms for Triangular Mesh Generation
+      http://www.cs.berkeley.edu/~jrs/papers/2dj.pdf
+    
+    """     
+    # check if mesh is still a Delaunay mesh
+    if self.__tri is None:
+      raise RuntimeError('Mesh is no longer a Delaunay mesh. Subdivision not implemented for this case.');
+      
+    bSkinny = self.find_skinny_triangles(self.simplices,rthresh=rthresh);
+    if skip_triangle is not None:
+      bSkinny &= ~skip_triangle(self.simplices);
+    if np.sum(bSkinny)==0: return; # nothing to do
+    
+    simplices = self.simplices[bSkinny];                   # shape (nTriangles,3)
+    triangles = self.image[simplices];                     # shape (nTriangles,3,2)
+    nTriangles= triangles.shape[0];
+
+    # identify the shortest edge of the triangle in image space (not cut)
+    lensq = np.sum( np.diff(triangles[:,[0,1,2,0]],axis=1)**2, axis=2); # shape (nTriangles,3)
+    min_edge = np.argmin( lensq,axis=1);                                # shape (nTriangles)
+ 
+    # find point as C (opposit to min_edge) and calculate midpoint on CA and CB
+    indC = min_edge-1;
+    A,B,C,new_domain_points,new_image_points = \
+                self.__resample_edges_of_triangle(simplices,indC,x=(0.5,));
+    new_domain_points=new_domain_points.reshape(2*nTriangles,2);
+    new_image_points =new_image_points.reshape(2*nTriangles,2);
+    
+    if bPlot:   
+      from matplotlib.collections import PolyCollection
+      fig = self.plot_triangulation();
+      fig.suptitle("DEBUG: refine_skinny_triangles()");
+      ax1,ax2 = fig.axes;
+      params = dict(facecolors='r', edgecolors='none', alpha=0.3);      
+      ax1.add_collection(PolyCollection(self.domain[simplices],**params));      
+      ax1.plot(new_domain_points[:,0],new_domain_points[:,1],'k.')      
+      ax2.add_collection(PolyCollection(self.image[simplices],**params));
+      ax2.plot(new_image_points[:,0],new_image_points[:,1],'k.')
         
+    
+    # update triangulation  
+    logging.debug("refining_skinny_triangles(): adding %d points"% (2*nTriangles));
+    self.image = np.vstack((self.image,new_image_points)); 
+    self.domain= np.vstack((self.domain,new_domain_points));   
+    self.__tri.add_points(new_domain_points);
+    self.simplices = self.__tri.simplices;
+
+    return 2*nTriangles;     
+
+
+      
   def refine_large_triangles(self,is_large):
     """
     subdivide large triangles in the image mesh
@@ -331,16 +416,21 @@ class AdaptiveMesh(object):
     # add center of gravity for critical triangles
     new_domain_points = np.sum(self.domain[self.simplices[ind]],axis=1)/3; # shape (nTriangles,2)
     # remove invalid points (coordinates are nan)    
-    new_domain_points = new_domain_points[~np.any(np.isnan(new_domain_points),axis=1)]
+    # new_domain_points = new_domain_points[~np.any(np.isnan(new_domain_points),axis=1)]
     # update triangulation    
     self.__tri.add_points(new_domain_points);
-    logging.info("refining_large_triangles(): adding %d points"%(new_domain_points.shape[0]))
+    logging.debug("refining_large_triangles(): adding %d points"%(new_domain_points.shape[0]))
     
     # calculate image points and update data
     new_image_points = self.mapping(new_domain_points);
     self.image = np.vstack((self.image,new_image_points));
     self.domain= np.vstack((self.domain,new_domain_points));
-    self.simplices = self.__tri.simplices;
+    # remove degenerated triangles (p1,p2 identical to A or B) => area is 0 
+    simplices = self.__tri.simplices;
+    area = self.get_area_in_domain(simplices);    
+    degenerated = np.abs(area/self.initial_domain_area)<1e-10;
+    assert(np.all(area[~degenerated]>0));               # by construction all triangles are oriented ccw
+    self.simplices = simplices[~degenerated];        # remove degenerate triangles
     
     return new_domain_points.shape[0];
 
@@ -400,7 +490,7 @@ class AdaptiveMesh(object):
  
     # find point as C (opposit to min_edge) and resample CA and CB
     indC = min_edge-1;
-    A,B,C,domain_points,image_points = self.__resample_edges_of_triangle(simplices,indC,nDivide);
+    A,B,C,domain_points,image_points = self.__resample_edges_of_triangle(simplices,indC,nDivide=nDivide);
                                                            # shape (nDivide,2,nTriangles,2)
     # determine indices of broken segments (largest elements in CA and CB)
     len_segments = np.sum(np.diff(image_points,axis=0)**2,axis=-1); 
@@ -492,9 +582,9 @@ class AdaptiveMesh(object):
     nInvalidVertices = np.sum(bInvalidVertex,axis=1);      # shape (nSimplices)
     new_simplices=[]; 
     ind_case1 = nInvalidVertices==1;
-    new_simplices.extend(self.__subdivide_triangles_with_one_invalid_vertex(ind_case1,nDivide));
+    new_simplices.extend(self.__subdivide_triangles_with_one_invalid_vertex(ind_case1,nDivide=nDivide));
     ind_case2 = nInvalidVertices==2;
-    new_simplices.extend(self.__subdivide_triangles_with_two_invalid_vertices(ind_case2,nDivide));
+    new_simplices.extend(self.__subdivide_triangles_with_two_invalid_vertices(ind_case2,nDivide=nDivide));
     new_simplices=np.reshape(new_simplices,(-1,3));    
     
     # update list of simplices
@@ -524,7 +614,7 @@ class AdaptiveMesh(object):
     
     # find invalid point as C (index on first axis) and resample CA and CB
     indC = np.where(np.any(np.isnan(triangles),axis=-1))[1];
-    A,B,C,domain_points,image_points = self.__resample_edges_of_triangle(simplices,indC,nDivide);
+    A,B,C,domain_points,image_points = self.__resample_edges_of_triangle(simplices,indC,nDivide=nDivide);
                                                            # shape (nDivide,2,nTriangles,2)
     assert(np.all(np.any(np.isnan(self.image[C]),axis=-1)));  # all points C should be invalid
 
@@ -572,7 +662,7 @@ class AdaptiveMesh(object):
 
     # find valid point as C (index on first axis) and resample CA and CB
     indC = np.where(~np.any(np.isnan(triangles),axis=-1))[1];
-    A,B,C,domain_points,image_points = self.__resample_edges_of_triangle(simplices,indC,nDivide);
+    A,B,C,domain_points,image_points = self.__resample_edges_of_triangle(simplices,indC,nDivide=nDivide);
                                                            # shape (nDivide,2,nTriangles,2)
     assert(np.all(np.any(np.isnan(self.image[A]),axis=-1)));  # all points A should be invalid
     assert(np.all(np.any(np.isnan(self.image[B]),axis=-1)));  # all points B should be invalid
@@ -601,17 +691,36 @@ class AdaptiveMesh(object):
         
 
 
-  def __resample_edges_of_triangle(self,simplices,indC,nDivide=10):
+  def __resample_edges_of_triangle(self,simplices,indC,x=None,nDivide=10):
     """
-    generate dense sampling on edges CA and CB on given simplices:
-      simplices ... vertex indices of triangles to resample, shape (nTriangles,3)
-      indC      ... vertex number (mod 3) that should be used as point C, shape (nTriangles)
-      nDivide   ... number of sampling points on CA and CB
-    returns: 
-      A,B,C     ... indices of points A,B,C, shape (nTriangles,)
-      domain_points(iPoint,iSide,iTriangle,xy) ... sampling points along CA,CB in domain
-      image_points(iPoint,iSide,iTriangle,xy)  ... sampling points along CA,CB in image
+    generate dense sampling on edges CA and CB on given simplices
+    
+    Parameters
+    ----------
+      simplices : ndarray of shape (nTriangles,3)
+        vertex indices of triangles that should be resampled
+      indC : vector of length nTriangles
+        vertex number (mod 3) that should be used as point C
+      x : vector of floats, optional
+        indicates position of sampling points
+      nDivide : integer, optional (only active if x=None)
+        number of sampling points on CA and CB
+      
+    Returns
+    -------
+      A,B,C : vector of ints, length (nTriangles)
+        indices of points A,B,C
+      domain_points : ndarray of shape (nDivide,2,nTriangle,2)
+        sampling points along CA,CB in domain, indices are (iPoint,iSide,iTriangle,xy)
+      image_points : ndarray of shape (nDivide,2,nTriangle,2)
+        sampling points along CA,CB in image
     """    
+    # handle optional arguments (sampling along CA and CB)
+    if x is None:
+      x = np.linspace(0,1,nDivide,endpoint=True)
+    else:
+      x = np.asarray(x); 
+      nDivide=x.size;
     # get indices of points ABC as shown above (C is isolated point)
     nTriangles = simplices.shape[0];    
     ind_triangle = np.arange(nTriangles)
@@ -619,7 +728,6 @@ class AdaptiveMesh(object):
     A = simplices[ind_triangle,(indC+1)%3];
     B = simplices[ind_triangle,(indC-1)%3];
     # create dense sampling along C->B and C->A in domain space
-    x = np.linspace(0,1,nDivide,endpoint=True);
     CA = np.outer(1-x,self.domain[C]) + np.outer(x,self.domain[A]);
     CB = np.outer(1-x,self.domain[C]) + np.outer(x,self.domain[B]);
     # map sampling on CA and CB to image space 
