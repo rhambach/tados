@@ -140,7 +140,7 @@ class AdaptiveMesh(object):
     bValid = max_lensq < lthresh**2; 
     return ~bValid;   # Note: differs from (max_lensq >= lthresh**2), if some vertices are invalid!
 
-  def find_skinny_triangles(self,simplices=None,rthresh=5):
+  def find_skinny_triangles(self,simplices=None,rthresh=5,Athresh=1e-10):
     """
     Identify triangles that deviate strongly from regular triangle (have very small angles)
     
@@ -151,7 +151,9 @@ class AdaptiveMesh(object):
       rthresh : float, optional
          relative threshold, specifies, how much smaller (area) a triangle
          can be compared to the corresponding regular triangle
-         
+      Athresh : float, optional
+         area in domain threshold (relative to total domain area)      
+      
     Returns
     -------
       bSkinny: boolean vector of length nTriangles
@@ -170,6 +172,7 @@ class AdaptiveMesh(object):
     # than the area of regular triangle sqrt(3)/4*maxlensq ~ 0.433*maxlensq
     bSkinny = np.abs(area) < (0.433/rthresh) * np.nanmax(lensq,axis=1);
       # note: nan's in area are not catched so far
+    bSkinny&= np.abs(area)/self.initial_domain_area > Athresh # triangle is large
       
     return bSkinny    
    
@@ -309,7 +312,7 @@ class AdaptiveMesh(object):
     return self.__add_new_simplices(np.asarray(new_simplices),bSkinny);  
   
   
-  def refine_skinny_triangles(self,skip_triangle=None,rthresh=5,scale_sampling=0.5,bPlot=False):
+  def refine_skinny_triangles(self,skip_triangle=None,rthresh=5,Athresh=1e-10,scale_sampling=0.5,bPlot=False):
     """
     subdivide skinny triangles in the image mesh (have very small angles)
     
@@ -321,6 +324,8 @@ class AdaptiveMesh(object):
       rthresh : float, optional
          relative threshold, specifies, how much smaller (area) a triangle
          can be compared to the corresponding regular triangle 
+      Athresh : float, optional
+         area in domain threshold (relative to total domain area)    
       scale_sampling : float, optional
          increasing scale_sampling will increase the number of subdivisions,
          a typical range is between 0.5 (default) and 1
@@ -343,7 +348,7 @@ class AdaptiveMesh(object):
     if self.__tri is None:
       raise RuntimeError('Mesh is no longer a Delaunay mesh. Subdivision not implemented for this case.');
       
-    bSkinny = self.find_skinny_triangles(self.simplices,rthresh=rthresh);
+    bSkinny = self.find_skinny_triangles(self.simplices,rthresh=rthresh,Athresh=Athresh);
     if skip_triangle is not None:
       bSkinny &= ~skip_triangle(self.simplices);
     if np.sum(bSkinny)==0: return; # nothing to do

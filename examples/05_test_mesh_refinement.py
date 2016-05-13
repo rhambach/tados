@@ -34,8 +34,8 @@ def analyze_transmission(hDDE):
     return xy;                             
 
   # set up image detector
-  image_size = np.asarray((0.35,0.2));
-  img = RectImageDetector(extent=image_size,pixels=(350,200));
+  image_size = np.asarray((1.1,0.3));
+  img = RectImageDetector(extent=image_size,pixels=(600,200));
   dbg = CheckTriangulationDetector();
   detectors=[img,dbg]
  
@@ -46,7 +46,7 @@ def analyze_transmission(hDDE):
     print("Field point: x=%5.3f, y=%5.3f"%(x,y))
     
     # pupil sampling (circular, adaptive mesh)
-    px,py=sampling.fibonacci_sampling_with_circular_boundary(500);
+    px,py=sampling.fibonacci_sampling_with_circular_boundary(5000);
     pupil_sampling = np.vstack((px,py)).T;                 # size (nPoints,2)  
     mapping = lambda(mesh_points): raytrace((x,y),mesh_points);
     Mesh=AdaptiveMesh(pupil_sampling, mapping);
@@ -54,14 +54,16 @@ def analyze_transmission(hDDE):
 
     # iterative refinement of skinny triangles
     rthresh = 2;
+    Athresh = 0.00001;
+    ref_steps = 1;
     is_skinny= lambda(simplices): Mesh.find_skinny_triangles(simplices=simplices,rthresh=rthresh);
     Mesh.plot_triangulation(skip_triangle=is_skinny);
-    for it in range(2): 
-      Mesh.refine_skinny_triangles(rthresh=rthresh,bPlot=True);
+    for it in range(ref_steps): 
+      Mesh.refine_skinny_triangles(rthresh=rthresh,Athresh=Athresh,bPlot=False);
     Mesh.plot_triangulation(skip_triangle=is_skinny);
  
     # subdivision of invalid triangles (raytrace failed for some vertices)
-    Mesh.refine_invalid_triangles(nDivide=100,bPlot=True);    
+    Mesh.refine_invalid_triangles(nDivide=100,bPlot=False);    
 
     # segmentation of triangles along cutting line
     lthresh = 0.5*image_size[1];
@@ -74,7 +76,8 @@ def analyze_transmission(hDDE):
       d.add(Mesh,bSkip=broken);# update detectors
 
   # plotting
-  img.show();
+  fig=img.show();
+  fig.suptitle('Geometric Image Analysis (%d refinement steps, %d rays)'% (ref_steps,Mesh.domain.shape[0]));
   
   return 1
 
@@ -90,7 +93,8 @@ if __name__ == '__main__':
     # load example file
     #filename = os.path.join(ln.zGetPath()[1], 'Sequential', 'Objectives', 
     #                        'Cooke 40 degree field.zmx')
-    filename= os.path.realpath('../tests/zemax/fraunhofer_logo.ZMX');
+    #filename= os.path.realpath('../tests/zemax/fraunhofer_logo.ZMX');
+    filename = os.path.realpath('X:/projekte/1504_surface_reconstruction/zemax/01_fraunhofer_logo.ZMX');    
     hDDE.load(filename);
     analyze_transmission(hDDE);
     
