@@ -14,7 +14,14 @@ def point_in_triangle(points,triangle):
   """
   assert (points.shape[0] == 2)
   assert (triangle.ndim<3 and triangle.shape == (3,2))
-  return PIT_barycentric(points,triangle);
+  # Bounding box of the triangle
+  x,y=points;  
+  xmin,ymin = np.min(triangle,axis=0);  # lower,left corner
+  xmax,ymax = np.max(triangle,axis=0);  # upper,right corner
+  isInside = (x>xmin) & (x<xmax) & (y>ymin) & (y<ymax);
+  # for points in bounding box, evaluate if they are in the triangle
+  isInside[isInside] = PIT_barycentric(points[:,isInside],triangle);
+  return isInside
   
 # Using cross product ----------------------------------------------------- 
 def same_side(p1,p2, a,b):
@@ -63,6 +70,8 @@ def PIT_barycentric(p, triangle):
 
   # Check if point is in triangle
   return (u >= 0) & (v >= 0) & (u + v < 1);
+  
+ 
 
 # Helper functions -------------------------------------------------------    
 def cyclic_path(triangles):
@@ -99,10 +108,9 @@ if __name__ == '__main__':
   points=np.random.randn(2,100);
   image =np.asarray(np.meshgrid(np.linspace(-2,1,1000),np.linspace(-3,2,1000)));
   
-  # test cross_product implementation
-  test_few_points(points,triangles,PIT_crossproduct);
-  test_image(image,triangles,PIT_crossproduct);
+  # test different implementations of point in triangle
+  for PIT in (PIT_crossproduct, PIT_barycentric, point_in_triangle):
+    print 'testing function %s ...' % (PIT.func_name)    
+    test_few_points(points,triangles,PIT);
+    test_image(image,triangles,PIT);
   
-  # test barycentric implementation
-  test_few_points(points,triangles,PIT_barycentric);
-  test_image(image,triangles,PIT_barycentric);
