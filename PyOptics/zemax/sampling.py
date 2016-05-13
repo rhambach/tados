@@ -27,7 +27,7 @@ def cartesian_sampling(nx,ny,rmax=1.):
   x = np.linspace(-1,1,nx);
   y = np.linspace(-1,1,ny);
   x,y=np.meshgrid(x,y);   
-  ind = x**2 + y**2 <= rmax;
+  ind = x**2 + y**2 <= rmax**2;
   return x[ind],y[ind]
 
 def hexapolar_sampling(Nr,rmax=1.,ind=False):
