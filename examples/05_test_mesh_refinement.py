@@ -37,7 +37,7 @@ def analyze_transmission(hDDE):
   image_size = np.asarray((1.1,0.3));
   img = RectImageDetector(extent=image_size,pixels=(600,200));
   dbg = CheckTriangulationDetector();
-  detectors=[img,dbg]
+  detectors=[img,]#dbg]
  
   # field sampling
   xx,yy=sampling.cartesian_sampling(3,3,rmax=.1);  # single point
@@ -46,21 +46,20 @@ def analyze_transmission(hDDE):
     print("Field point: x=%5.3f, y=%5.3f"%(x,y))
     
     # pupil sampling (circular, adaptive mesh)
-    px,py=sampling.fibonacci_sampling_with_circular_boundary(5000);
+    px,py=sampling.fibonacci_sampling_with_circular_boundary(300);
     pupil_sampling = np.vstack((px,py)).T;                 # size (nPoints,2)  
     mapping = lambda(mesh_points): raytrace((x,y),mesh_points);
     Mesh=AdaptiveMesh(pupil_sampling, mapping);
 
-
     # iterative refinement of skinny triangles
-    rthresh = 2;
+    rthresh = [1.7,1.5,1.7,2,3,3,4,4];
     Athresh = 0.00001;
-    ref_steps = 1;
-    is_skinny= lambda(simplices): Mesh.find_skinny_triangles(simplices=simplices,rthresh=rthresh);
+    ref_steps =5;
+    is_skinny= lambda(simplices): Mesh.find_skinny_triangles(simplices=simplices,rthresh=rthresh[0]);
     Mesh.plot_triangulation(skip_triangle=is_skinny);
     for it in range(ref_steps): 
-      Mesh.refine_skinny_triangles(rthresh=rthresh,Athresh=Athresh,bPlot=False);
-    Mesh.plot_triangulation(skip_triangle=is_skinny);
+      Mesh.refine_skinny_triangles(rthresh=rthresh[it],Athresh=Athresh,bPlot=True);
+    Mesh.plot_triangulation();
  
     # subdivision of invalid triangles (raytrace failed for some vertices)
     Mesh.refine_invalid_triangles(nDivide=100,bPlot=False);    

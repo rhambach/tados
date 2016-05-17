@@ -33,7 +33,7 @@ def analyze_transmission(hDDE):
     print("Field point: x=%5.3f, y=%5.3f"%(x,y))
     
     # init adaptive mesh for pupil sampling☺
-    px,py=sampling.fibonacci_sampling_with_circular_boundary(2000)  
+    px,py=sampling.fibonacci_sampling_with_circular_boundary(500)  
     initial_sampling = np.vstack((px,py)).T;         # size (nPoints,2)
     def raytrace(pupil_points):        # local function for raytrace
       px,py = pupil_points.T;
@@ -54,7 +54,7 @@ def analyze_transmission(hDDE):
       # segmentation of triangles along cutting line
       lthresh = 0.5*image_size[1];
       is_broken = lambda(simplices): Mesh.find_broken_triangles(simplices=simplices,lthresh=lthresh);  
-      Mesh.refine_broken_triangles(is_broken,nDivide=100,bPlot=False);
+      Mesh.refine_broken_triangles(is_broken,nDivide=7,bPlot=True);
       if i==0: Mesh.plot_triangulation(skip_triangle=is_broken);      
     pupil_points, image_points, simplices = Mesh.get_mesh();
 

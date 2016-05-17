@@ -18,7 +18,7 @@ def __test_intensity_footprint(hDDE):
   
   # raytrace parameters
   image_surface = 20;                      # 20: without spider, 21: with spider aperture
-  wavenum  = 4;
+  wavenum  = 1;
   def raytrace(params, pupil_points):      # local function for raytrace
     x,y   = params;      
     px,py = pupil_points.T;                # shape (nPoints,)
