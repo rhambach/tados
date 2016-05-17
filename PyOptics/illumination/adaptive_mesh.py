@@ -85,6 +85,8 @@ class AdaptiveMesh(object):
     ax2.triplot(self.image[:,0], self.image[:,1], simplices,'b-');
     ax2.plot(self.initial_image[:,0],self.initial_image[:,1],'r.')
 
+    ax1.set_aspect('equal'); 
+    ax2.set_aspect('equal');
     return fig;
 
 
@@ -365,8 +367,9 @@ class AdaptiveMesh(object):
     indC = min_edge-1;
     A,B,C,new_domain_points,new_image_points = \
                 self.__resample_edges_of_triangle(simplices,indC,x=(0.5,));
-    new_domain_points=new_domain_points.reshape(2*nTriangles,2);
-    new_image_points =new_image_points.reshape(2*nTriangles,2);
+    # unique domain_points
+    new_domain_points = np.vstack(set(map(tuple, new_domain_points.reshape(2*nTriangles,2))))
+    new_image_points = self.mapping(new_domain_points);
     
     if bPlot:   
       from matplotlib.collections import PolyCollection
@@ -381,7 +384,7 @@ class AdaptiveMesh(object):
         
     
     # update triangulation  
-    logging.debug("refining_skinny_triangles(): adding %d points"% (2*nTriangles));
+    logging.debug("refining_skinny_triangles(): adding %d points"% (new_domain_points.shape[0]));
     self.image = np.vstack((self.image,new_image_points)); 
     self.domain= np.vstack((self.domain,new_domain_points));   
     self.__tri.add_points(new_domain_points);
@@ -517,8 +520,12 @@ class AdaptiveMesh(object):
     self.domain= np.vstack((self.domain,new_domain_points.reshape(-1,2)));    
    
     if bPlot:   
+      from matplotlib.collections import PolyCollection
       fig = self.plot_triangulation(skip_triangle=is_broken);
+      fig.suptitle("DEBUG: refine_broken_triangles()");
       ax1,ax2 = fig.axes;
+      #params = dict(facecolors='r', edgecolors='none', alpha=0.3);      
+      #ax1.add_collection(PolyCollection(self.domain[simplices],**params));   
       ax1.plot(domain_points[...,0].flat,domain_points[...,1].flat,'k.',label='test points');
       ax1.plot(new_domain_points[...,0].flat,new_domain_points[...,1].flat,'g.',label='selected points');
       ax1.legend(loc=0);      
@@ -536,15 +543,20 @@ class AdaptiveMesh(object):
     t1=np.vstack((C,p1,p2));                        # shape (3,nTriangles)
     t2=np.vstack((p1,p3,p2));
     t3=np.vstack((p2,p3,p4));
-    t4=np.vstack((p4,p3,A));
+    t4=np.vstack((p3,A,p4));
     t5=np.vstack((p4,A,B));
     new_simplices = np.hstack((t1,t2,t3,t4,t5)).T;  
        # shape (5*nTriangles,3), reshape as (5,nTriangles,3) to obtain subdivision of each triangle  
 
     # DEBUG subdivision of triangles
     if bPlot:
+      ax1.add_collection(PolyCollection(self.domain[t1.T],edgecolor='none',facecolor='b',alpha=0.3));   
+      ax1.add_collection(PolyCollection(self.domain[t2.T],edgecolor='none',facecolor='r',alpha=0.3));   
+      ax1.add_collection(PolyCollection(self.domain[t3.T],edgecolor='none',facecolor='y',alpha=0.3));   
+      ax1.add_collection(PolyCollection(self.domain[t4.T],edgecolor='none',facecolor='g',alpha=0.3));   
+      ax1.add_collection(PolyCollection(self.domain[t5.T],edgecolor='none',facecolor='k',alpha=0.3));   
       for t in bPlotTriangles: # select index of triangle to look at
-        BCA=[B[t],C[t],A[t]]; subdiv=new_simplices[t::nTriangles,:];
+        BCA=[B[t],C[t],A[t]]; subdiv=[ C[t],p1[t],p2[t],p3[t],p4[t],A[t] ];
         pt=self.domain[BCA]; ax1.plot(pt[...,0],pt[...,1],'g')
         pt=self.image[BCA];  ax2.plot(pt[...,0],pt[...,1],'g')
         pt=self.domain[subdiv]; ax1.plot(pt[...,0],pt[...,1],'r')
