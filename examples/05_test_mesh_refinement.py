@@ -92,8 +92,7 @@ if __name__ == '__main__':
     # load example file
     #filename = os.path.join(ln.zGetPath()[1], 'Sequential', 'Objectives', 
     #                        'Cooke 40 degree field.zmx')
-    #filename= os.path.realpath('../tests/zemax/fraunhofer_logo.ZMX');
-    filename = os.path.realpath('X:/projekte/1504_surface_reconstruction/zemax/01_fraunhofer_logo.ZMX');    
+    filename= os.path.realpath('../tests/zemax/fraunhofer_logo.ZMX');
     hDDE.load(filename);
     analyze_transmission(hDDE);
     
