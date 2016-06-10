@@ -78,6 +78,8 @@ class DDElinkHandler(object):
         cartesian coordinates of ray on requested surface (local coordinates)
       l,m,n : float 
         direction cosines after requested surface (local coordinates)
+      l2,m2,n2 : float
+        direction cosines of surface normal at point of incidence (local coordinates)
        
     """
     # enlarge all vector arguments to same size    
@@ -88,8 +90,8 @@ class DDElinkHandler(object):
     if np.isscalar(py): py = np.zeros(nRays)+py;    
     if np.isscalar(waveNum): waveNum=np.zeros(nRays,np.int)+waveNum;
     assert(all(args.size == nRays for args in [x,y,px,py,waveNum]))
-    #print("number of rays: %d"%nRays);
-    #t = time.time();    
+    print("number of rays: %d"%nRays);
+    import time;  t = time.time();    
         
     # fill in ray data array (following Zemax notation!)
     rays = at.getRayDataArray(nRays, tType=0, mode=mode, endSurf=surf)
@@ -100,15 +102,15 @@ class DDElinkHandler(object):
       rays[k+1].l = py[k]
       rays[k+1].wave = waveNum[k];
 
-    #print("set pupil values: %ds"%(time.time()-t))
+    print("set pupil values: %ds"%(time.time()-t))
 
     # Trace the rays
     ret = at.zArrayTrace(rays, timeout=100000)
-    #print("zArrayTrace: %ds"%(time.time()-t))
-#
+    print("zArrayTrace: %ds"%(time.time()-t))
+
     # collect results
-    results = np.asarray( [(r.error,r.vigcode,r.x,r.y,r.z,r.l,r.m,r.n) for r in rays[1:]] );
-    #print("retrive data: %ds"%(time.time()-t))    
+    results = np.asarray( [(r.error,r.vigcode,r.x,r.y,r.z,r.l,r.m,r.n,r.Exr,r.Eyr,r.Ezr) for r in rays[1:]] );
+    print("retrive data: %ds"%(time.time()-t))    
     return results;
 
 
