@@ -75,19 +75,21 @@ class CheckTriangulationDetector(Detector):
 class RectImageDetector(Detector):    
   " 2D Image Detector with cartesian coordinates "
 
-  def __init__(self, extent=(1,1), pixels=(100,100)):
+  def __init__(self, extent=(1,1), pixels=(100,100), origin=(0,0)):
     """
      extent ... size of detector in image space (xwidth, ywidth)
      pixels ... number of pixels in x and y (xnum,ynum)
+     origin ... center position of detector in image space (x0,y0)
      
      Note, 'ij' indexing is used,  i.e,. self.points[:,ix,iy]=(x,y)
     """
     self.extent = np.asarray(extent);
     self.pixels = np.asarray(pixels);
+    self.origin = np.asarray(origin);
     # cartesian sampling 
-    xmax,ymax = self.extent/2.; nx,ny = self.pixels;    
-    xbins = np.linspace(-xmax,xmax,nx+1);         # edges of nx pixels  
-    ybins = np.linspace(-ymax,ymax,ny+1);
+    xmax,ymax = self.extent/2.; nx,ny = self.pixels; x0,y0 = self.origin   
+    xbins = np.linspace(x0-xmax,x0+xmax,nx+1);    # edges of nx pixels  
+    ybins = np.linspace(y0-ymax,y0+ymax,ny+1);
     x = 0.5*(xbins[:-1]+xbins[1:]);               # centers of nx pixels
     y = 0.5*(ybins[:-1]+ybins[1:]);    
     self.points = np.asarray(np.meshgrid(x,y,indexing='ij')); # shape: (2,numx,numy)
@@ -123,8 +125,9 @@ class RectImageDetector(Detector):
     # footprint    
     fig,(ax1,ax2)= plt.subplots(2);
     ax1.set_title("footprint in image plane");
+    x0,y0=self.origin-self.extent/2.; x1,y1=self.origin+self.extent/2.;
     ax1.imshow(intensity.T,origin='lower',aspect='auto',interpolation='hanning',
-             extent=np.outer(self.extent,[-0.5,0.5]).flatten());
+             extent=[x0,x1,y0,y1]);
     # projections    
     ax2.set_title("projected intensity in image plane");    
     ax2.plot(x,xprofile,label="along x");

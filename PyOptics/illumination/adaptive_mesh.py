@@ -63,10 +63,16 @@ class AdaptiveMesh(object):
   def plot_triangulation(self,skip_triangle=None):
     """
     plot current triangulation of adaptive mesh in domain and image space
-      skip_triangle... (opt) function mask=skip_triangle(simplices) that accepts a list of 
-                     simplices of shape (nTriangles, 3) and returns a flag 
-                     for each triangle indicating that it should not be drawn
-    returns figure handle;
+    
+    Parameters
+    ----------
+      skip_triangle : function mask=skip_triangle(simplices), optional
+        function that accepts a ndarray of simplices of shape (nTriangles, 3) 
+        and returns a flag for each triangle indicating that it should not be drawn
+        
+    Return
+    ------
+      handle to new matplotlib figure
     """ 
     simplices = self.simplices.copy();
     if skip_triangle is not None:
@@ -78,15 +84,18 @@ class AdaptiveMesh(object):
     ax1.set_title("Sampling + Triangulation in Domain");
     if skip_triangle is not None and np.sum(skip)>0:
       ax1.triplot(self.domain[:,0], self.domain[:,1], skipped_simplices,'k:');
-    ax1.triplot(self.domain[:,0], self.domain[:,1], simplices,'b-');    
+    if len(simplices)>0:
+      ax1.triplot(self.domain[:,0], self.domain[:,1], simplices,'b-');    
     ax1.plot(self.initial_domain[:,0],self.initial_domain[:,1],'r.')
     
     ax2.set_title("Sampling + Triangulation in Image")
-    ax2.triplot(self.image[:,0], self.image[:,1], simplices,'b-');
+    if len(simplices)>0:
+      ax2.triplot(self.image[:,0], self.image[:,1], simplices,'b-');
     ax2.plot(self.initial_image[:,0],self.initial_image[:,1],'r.')
 
-    ax1.set_aspect('equal'); 
-    ax2.set_aspect('equal');
+    # if aspect is close to 1 force aspect to be 1
+    if 1./4 < ax1.get_data_ratio() < 4: ax1.set_aspect('equal'); 
+    if 1./4 < ax2.get_data_ratio() < 4: ax2.set_aspect('equal');
     return fig;
 
 
@@ -589,7 +598,10 @@ class AdaptiveMesh(object):
     """
     vertices = self.image[self.simplices];                 # shape (nSimplices,3,2)    
     bInvalidVertex = np.any(np.isnan(vertices),axis=2);    # shape (nSimplices,3)   
-    if ~np.any(bInvalidVertex): return 0;                  # nothing to do
+    if ~np.any(bInvalidVertex): return 0;                  # all valid: nothing to do
+    if np.all(bInvalidVertex):                             # all invalid: can do nothing
+      logging.warning('all rays are invalid');
+      return 0;
     
     # we consider three cases: 
     #  1. one vertex is invalid (generate two new triangles)
