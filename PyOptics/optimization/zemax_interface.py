@@ -4,15 +4,22 @@ Module providing a class for optimizing optical systems in Zemax
 @author: Lippmann
 """
 
-
 import numpy as np
-import pyzdde.zdde as pyz
-
 
 class External_Zemax_Optimizer(object):
-    def __init__(self):
-        self.zlink = pyz.createLink()
+  
+    def __init__(self,hDDE,filename):
+        self.hDDE=hDDE;
+        self.zlink = hDDE.link;
+        self.filename=filename;
+        self.reset();
+        # variable parameters 
         self.variables = self.getVariables()
+      
+    def reset(self):
+        " reset system to original state"
+        self.hDDE.load(self.filename);
+        self.zlink.zPushLens(1);
 
     def getVariables(self):
         # TODO: include extra data editor
@@ -25,7 +32,7 @@ class External_Zemax_Optimizer(object):
         return variables
 
     def evaluate(self, x):
-        if len(x.shape) == 1:
+        if x.ndim == 1:
             self.setSystemState(x)
             val = np.array(self.zlink.zOptimize(-1))
         else:
@@ -64,6 +71,3 @@ class External_Zemax_Optimizer(object):
     def showSystem(self, x):
         self.setSystemState(x)
         self.zlink.zPushLens(1)
-
-    def __del__(self):
-        self.zlink.close()
