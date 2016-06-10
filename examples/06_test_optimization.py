@@ -15,10 +15,6 @@ import _set_pkgdir
 import PyOptics.optimization as opt
 from PyOptics.zemax import dde_link
 
-def print_status(x):  
-  print x;
-
-
 if __name__ == '__main__':
   import os as os
   logging.basicConfig(level=logging.INFO);
@@ -30,11 +26,13 @@ if __name__ == '__main__':
     # run optimization using specified method
     method=None;    
     x0=zmx_opt.getSystemState();
-    res=minimize(zmx_opt.evaluate,x0,method=method,callback=print_status)    
+    zmx_opt.print_status();
+    res=minimize(zmx_opt.evaluate,x0,method=method,callback=zmx_opt.print_status)    
     # analyze results
     zmx_opt.showSystem(res.x);
     print(res.message)
 
+    
     
     
     
