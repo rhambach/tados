@@ -26,7 +26,7 @@ class External_Zemax_Optimizer(object):
         surfaces = self.zlink.zGetNumSurf()
         variables = []
         for surf in xrange(surfaces + 1):
-            for param in xrange(18):
+            for param in range(0,3)+range(4,18):     # exclude SDIA=column #3
                 if self.zlink.zGetSolve(surf, param)[0] == 1:
                     variables.append((surf, param))
         return variables
@@ -39,10 +39,10 @@ class External_Zemax_Optimizer(object):
         names.extend(['Par0']);
         return ["S%d.%s"%(surf,names[param]) 
                   for (surf,param) in self.variables];
-        
+    
     def evaluate(self, x):
         """
-        evaluate the Zemax mertit function for the system state x
+        evaluate the Zemax merit function for the system state x
         
         Parameters
         ----------
@@ -90,6 +90,8 @@ class External_Zemax_Optimizer(object):
             # Parameter 0 is addressed by solve parameter number 17
             elif param == 17:
                 self.zlink.zSetSurfaceParameter(surf, 0, x[i])
+        # update pupil positions, solves, and index data and return error flag
+        return self.zlink.zGetUpdate();
 
     def showSystem(self, x):
         self.setSystemState(x)
