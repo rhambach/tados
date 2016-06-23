@@ -9,25 +9,24 @@ from sys import stdout
 import logging
 
 class External_Zemax_Optimizer(object):
-    """
-    interface for optimizing optical systems in Zemax
-    
-    Note
-    ----
-      to enable debugging, set the log level to DEBUG 
-      ```
-      import logging 
-      logging.basicConfig(level=logging.DEBUG);
-      ```
-    """
+
     def __init__(self,hDDE,filename):
         """
+        interface for optimizing optical systems in Zemax
+    
         Parameters
         ----------
           hDDE : instance of pyOptics.zemax.dde_link.DDElinkHandler
             DDE-link handler
           filename : string
             name of the ZMX system file
+        
+        Note
+        ----
+        to enable debugging, set the log level to DEBUG 
+        
+        >>> import logging 
+        >>> logging.basicConfig(level=logging.DEBUG);
         """
         self.hDDE=hDDE;
         self.zlink = hDDE.link;
