@@ -124,7 +124,7 @@ class RectImageDetector(Detector):
     y,yprofile = self.y_projection(fMask);    
     # footprint    
     fig,(ax1,ax2)= plt.subplots(2);
-    ax1.set_title("footprint in image plane");
+    ax1.set_title("RectImageDetector: footprint in image plane");
     x0,y0=self.origin-self.extent/2.; x1,y1=self.origin+self.extent/2.;
     ax1.imshow(intensity.T,origin='lower',aspect='auto',interpolation='hanning',
              extent=[x0,x1,y0,y1]);
@@ -138,7 +138,7 @@ class RectImageDetector(Detector):
     if fMask is None: 
       assert(np.allclose(np.nansum(intensity)*dx*dy, 
                         [np.sum(xprofile)*dx,np.sum(yprofile)*dy])); # total power must be the same
-    logging.info('total power: %5.3f W'%(np.sum(intensity)*dx*dy)); 
+    logging.debug('RectImageDetector: total power = %5.3f W'%(np.sum(intensity)*dx*dy)); 
     return fig
 
   def get_footprint(self,fMask=None):
@@ -221,7 +221,7 @@ class PolarImageDetector(Detector):
     " plotting 2D footprint in image plane, returns figure handle"
     fig,(ax1,ax2)= plt.subplots(2);
     # footprint
-    ax1.set_title("footprint in image plane");
+    ax1.set_title("PolarImageDetector: footprint in image plane");
     ax1.tripcolor(self.points[0],self.points[1],self.intensity);
     # azimuthal average
     r, radial_profile, encircled_energy = self.radial_projection();
@@ -229,7 +229,7 @@ class PolarImageDetector(Detector):
     ax2.plot(r,radial_profile,label='radial profile');
     ax2.plot(r,encircled_energy,label='encircled energy');
     ax2.legend(loc=0)
-    logging.info('total power: %5.3f W'%(encircled_energy[-1])); 
+    logging.debug('PolarImageDetector: total power = %5.3f W'%(encircled_energy[-1])); 
     return fig
 
   def get_footprint(self):
@@ -258,6 +258,113 @@ class PolarImageDetector(Detector):
     encircled_energy = np.cumsum(radial_profile*self.weight_of_ring*np.pi*self.rmax**2);
     return r, radial_profile, encircled_energy
 
+
+class LineImageDetector(Detector):    
+  """
+  1D Image Detector along a specified direction
+  """
+  def __init__(self, pixels=50, start=(0,0), end=(1,0)):
+    """
+     pixels ... number of pixels
+     start  ... starting-point of detector
+     end    ... end-point of detector
+    """
+    self.pixels=pixels;
+    self.start =np.asarray(start);
+    self.end   =np.asarray(end);
+    # equidistant sampling along line start-end
+    self.__x_rc = x = np.arange(pixels,dtype=float)/pixels;      # x in reduced coordinates
+    self.points=np.outer(1-x,self.start) + np.outer(x,self.end); # shape (pixels,2)
+    self.intensity = np.zeros(self.pixels); 
+    
+  def add(self,mesh,bSkip=[],weight=1,bPlot=False):
+    """
+    calculate projection onto line-detector in image plane
+      mesh ... instance of AdaptiveMesh 
+      bSkip... logical array indicating simplices that should be skipped
+      weight.. weight of contribution (intensity in Watt)
+      bPlot... if True, plot triangulation and calculated density on line-detector
+    """
+    # get coordinates of each triangle in mesh
+    simplices = mesh.simplices;                        # shape (nTriangles,3)
+    if np.any(bSkip): simplices=simplices[~bSkip];
+    triangles = mesh.image[simplices];                 # shape (nTriangles,3,2)
+
+    # switch to coordinates along direction of detector
+    ex = self.end-self.start;                          # new x-axis (normalized vector)
+    xmax=np.linalg.norm(ex);
+    ex = ex/xmax;
+    ey = np.array((-ex[1],ex[0]));                     # new y-axis (perpendicular to x)
+    triangles_along_dir = \
+      np.tensordot(triangles-self.start, [ex,ey], axes=(2,1));    # (i,j,:) * (k,:), shape (nTriangles,3,2)
+
+    # calculate weight of each triangle
+    domain_area = mesh.get_area_in_domain(); 
+    domain_area/= mesh.initial_domain_area;       # normalized weight in domain
+    image_area  = mesh.get_area_in_image();       # size of triangle in image
+    density = weight * abs( domain_area / image_area);
+    if np.any(bSkip): density=density[~bSkip];
+
+    # integrate over triangle (given in coordinates along direction and perpendicular)
+    intensity=self.__project_triangles_to_x(triangles_along_dir,xmax,density);
+    self.intensity+=intensity;
+    
+    # DEBUG: plot mesh and calculated intensity
+    if bPlot:
+      fig,ax1= plt.subplots(1,1);
+      # plot triangulation and projection axis
+      ax1.set_title("LineImageDetector: Triangulation and Projected Density");
+      ax1.set_aspect('equal');
+      ax1.triplot(mesh.image[:,0], mesh.image[:,1], simplices,'b-');        
+      ax1.plot([self.start[0],self.end[0]],[self.start[1],self.end[1]],'r',label='projection axis');
+      # plot rotated intensity
+      x=self.__x_rc*xmax;   
+      y=intensity*mesh.initial_domain_area;        # rescale density, y is projected area
+      data = self.start[:,np.newaxis] + np.outer(ex,x) + np.outer(ey,y);
+      ax1.plot(data[0],data[1],'g',label="projected area");
+      ax1.legend(loc=0);
+
+
+  def __project_triangles_to_x(self,triangles,xmax,weights):
+    " project all triangles (shape: nTriangles,3,2) to x-coordinate in interval (0,xmax)"
+    # ToDo: could be replaced by more efficient function (C-code)
+    nTriangles= triangles.shape[0];  
+    x=triangles[:,:,0]; y=triangles[:,:,1];
+
+    # for each triangle, sort vertices such that first vertex A has minimal x-coordinate, 
+    # second vertex B has maximal x-coordinate, and third vertex C is in-between
+    A,C,B = np.argsort(x).T;    
+    ind   = np.ogrid[:nTriangles];
+    Ax= x[ind,A]; Ay= y[ind,A]; 
+    Bx= x[ind,B]; By= y[ind,B];
+    Cx= x[ind,C]; Cy= y[ind,C];             # shape (nTriangles,)
+ 
+    # setup x-points for projecting triangles, nan's indicate range outside triangle
+    x,_=np.meshgrid( self.__x_rc*xmax, np.arange(nTriangles), indexing='ij' );
+    x[np.logical_or(x<Ax,x>Bx)]=np.nan;
+    
+    # y-values along AB,AC and BC for all x-values between [0,1)
+    y0 = Ay + (x-Ax) * ((By-Ay)/(Bx-Ax));   # AB, shape (pixels,nTriangles);
+    y1 = Ay + (x-Ax) * ((Cy-Ay)/(Cx-Ax));   # AC
+    yCB = Cy + (x-Cx) * ((By-Cy)/(Bx-Cx));  # CB
+    y1[x>Cx] = yCB[x>Cx];                   # line ACB
+    
+    # line segment inside each triangle, weighted sum over all triangles
+    dy = np.abs(y1-y0);                     # shape (pixels,nTriangles)
+    intensity = np.nansum(dy*weights,axis=1);
+    return intensity;
+
+  def show(self,fig=None,**kwargs):
+    " plot projected intensity in image plane, returns figure handle"
+    if fig is None: fig,ax1 = plt.subplots(1);
+    else:           ax1=fig.axes[0];
+    # footprint
+    ax1.set_title("LineImageDetector: projected intensity in image plane");
+    x=np.linalg.norm(self.points,axis=1); dx=x[1]-x[0];
+    ax1.plot(x,self.intensity,**kwargs);
+    # azimuthal average
+    logging.debug('LineImageDetector: total power = %5.3f W'%(np.sum(self.intensity)*dx)); 
+    return fig
 
 class Transmission(object):
   def __init__(self, parameters, mesh_points, raytrace, detectors, weights=None):
@@ -295,7 +402,7 @@ class Transmission(object):
     # incoherent sum on detector over all raytrace parameters
     for ip,p in enumerate(self.parameters):
       logging.info("Transmission for parameter: "+str(p));      
-      
+
       # initialize adaptive grid for 
       mapping = lambda(mesh_points): self.raytrace(p,mesh_points);
       Mesh=AdaptiveMesh(self.mesh_points, mapping);  
@@ -318,3 +425,31 @@ class Transmission(object):
         d.add(Mesh,bSkip=broken,weight=self.weights[ip]);
 
 
+
+
+
+
+if __name__ == '__main__':
+  logging.basicConfig(level=logging.DEBUG);
+
+  # generate random mesh
+  points = np.random.rand(10,2);  # shape(nPoints,2)
+  mesh=AdaptiveMesh(points,lambda x: x);
+  bSkip = np.zeros(mesh.simplices.shape[0],dtype=np.bool);  bSkip[0] = True;  
+
+  # test all detectors
+  Dcheck= CheckTriangulationDetector();
+  Drect = RectImageDetector(extent=(1,1),origin=(0.5,0.5));
+  Dpol  = PolarImageDetector(rmax=1);
+  DlineX= LineImageDetector(pixels=100,start=(0,0),end=(1,0));
+  DlineY= LineImageDetector(pixels=100,start=(0,0),end=(0,1));
+  DlineArb = LineImageDetector(pixels=100,start=(0,-0.5),end=(1,1))    
+  
+  Dcheck.add(mesh,bSkip=bSkip); 
+  Drect.add(mesh,bSkip=bSkip); Drect.show();
+  Dpol.add(mesh,bSkip=bSkip);  Dpol.show();
+  DlineX.add(mesh,bSkip=bSkip); fig=DlineX.show();
+  DlineY.add(mesh,bSkip=bSkip); DlineY.show(fig=fig);
+  DlineArb.add(mesh,bSkip=bSkip,bPlot=True);
+  
+  
