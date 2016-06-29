@@ -274,7 +274,7 @@ class LineImageDetector(Detector):
     self.end   =np.asarray(end);
     # equidistant sampling along line start-end
     self.__x_rc = x = np.arange(pixels,dtype=float)/pixels;      # x in reduced coordinates
-    self.points=np.outer(1-x,self.start) + np.outer(x,self.end); # shape (pixels,2)
+    self.points=np.outer(1-x,self.start) + np.outer(x,self.end); # shape (pixels,2)    
     self.intensity = np.zeros(self.pixels); 
     
   def add(self,mesh,bSkip=[],weight=1,bPlot=False):
@@ -339,32 +339,37 @@ class LineImageDetector(Detector):
     Bx= x[ind,B]; By= y[ind,B];
     Cx= x[ind,C]; Cy= y[ind,C];             # shape (nTriangles,)
  
-    # setup x-points for projecting triangles, nan's indicate range outside triangle
-    x,_=np.meshgrid( self.__x_rc*xmax, np.arange(nTriangles), indexing='ij' );
-    x[np.logical_or(x<Ax,x>Bx)]=np.nan;
-    
-    # y-values along AB,AC and BC for all x-values between [0,1)
-    y0 = Ay + (x-Ax) * ((By-Ay)/(Bx-Ax));   # AB, shape (pixels,nTriangles);
-    y1 = Ay + (x-Ax) * ((Cy-Ay)/(Cx-Ax));   # AC
-    yCB = Cy + (x-Cx) * ((By-Cy)/(Bx-Cx));  # CB
-    y1[x>Cx] = yCB[x>Cx];                   # line ACB
-    
-    # line segment inside each triangle, weighted sum over all triangles
-    dy = np.abs(y1-y0);                     # shape (pixels,nTriangles)
-    intensity = np.nansum(dy*weights,axis=1);
-    return intensity;
+    # calculate distance of vertices to line AB (along y-direction)
+    Cy= np.abs( (Cy-Ay) - (By-Ay) * ((Cx-Ax)/(Bx-Ax)) );
+    Ay=By=0;
 
+    # setup x-points for projecting triangles, and indices inside triangle
+    x,_=np.meshgrid( self.__x_rc*xmax, np.arange(nTriangles), indexing='ij' );
+    dy =np.zeros(x.shape);    
+    iAC = np.logical_and(Ax<=x,x<Cx);
+    iCB = np.logical_and(Cx<=x,x<=Bx);
+
+    # determin y-height of AC and CB over AB for all x-values between [0,xmax) 
+    dy[iAC] = ((x-Ax) * (Cy/(Cx-Ax)))[iAC];   # AC
+    dy[iCB] = ((x-Bx) * (Cy/(Cx-Bx)))[iCB];   # CB
+    assert np.all(dy>=0), "projected area should be non-negative"    
+    
+    # calculate weighted sum over all triangles
+    return np.nansum(dy*weights,axis=1);   
+   
   def show(self,fig=None,**kwargs):
     " plot projected intensity in image plane, returns figure handle"
     if fig is None: fig,ax1 = plt.subplots(1);
     else:           ax1=fig.axes[0];
     # footprint
     ax1.set_title("LineImageDetector: projected intensity in image plane");
-    x=np.linalg.norm(self.points,axis=1); dx=x[1]-x[0];
+    x=self.__x_rc*np.linalg.norm(self.end-self.start); dx=x[1]-x[0];
     ax1.plot(x,self.intensity,**kwargs);
     # azimuthal average
     logging.debug('LineImageDetector: total power = %5.3f W'%(np.sum(self.intensity)*dx)); 
     return fig
+
+
 
 class Transmission(object):
   def __init__(self, parameters, mesh_points, raytrace, detectors, weights=None):
@@ -433,7 +438,7 @@ if __name__ == '__main__':
   logging.basicConfig(level=logging.DEBUG);
 
   # generate random mesh
-  points = np.random.rand(10,2);  # shape(nPoints,2)
+  points = np.random.rand(5,2);  # shape(nPoints,2)
   mesh=AdaptiveMesh(points,lambda x: x);
   bSkip = np.zeros(mesh.simplices.shape[0],dtype=np.bool);  bSkip[0] = True;  
 
@@ -443,13 +448,13 @@ if __name__ == '__main__':
   Dpol  = PolarImageDetector(rmax=1);
   DlineX= LineImageDetector(pixels=100,start=(0,0),end=(1,0));
   DlineY= LineImageDetector(pixels=100,start=(0,0),end=(0,1));
-  DlineArb = LineImageDetector(pixels=100,start=(0,-0.5),end=(1,1))    
+  DlineArb = LineImageDetector(pixels=100,start=(0,-.5),end=(1,1))    
   
   Dcheck.add(mesh,bSkip=bSkip); 
   Drect.add(mesh,bSkip=bSkip); Drect.show();
   Dpol.add(mesh,bSkip=bSkip);  Dpol.show();
   DlineX.add(mesh,bSkip=bSkip); fig=DlineX.show();
   DlineY.add(mesh,bSkip=bSkip); DlineY.show(fig=fig);
-  DlineArb.add(mesh,bSkip=bSkip,bPlot=True);
+  DlineArb.add(mesh,bSkip=bSkip,bPlot=True); 
   
   
