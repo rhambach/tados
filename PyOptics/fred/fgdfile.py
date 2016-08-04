@@ -5,10 +5,12 @@ Created on Mon Jul 11 15:51:05 2016
 @author: ulip
 """
 
+import io
+import time
 import numpy as np
 
 
-def from_fgd(f, header_info=False):
+def fgd2array(f, header_info=False):
     """
     Construct an array from data in a FRED FGD file.
     
@@ -18,7 +20,7 @@ def from_fgd(f, header_info=False):
             Open the file object or filename.
         header_info : bool
             If ``True`` returns a dict with the contents of the header of the file
-            along with the actual data array.
+            alongside with the actual data array.
     
     Example
     -------
@@ -136,3 +138,58 @@ def from_fgd(f, header_info=False):
         return data, info
     else:
         return data
+
+
+def array2fgd(filename, a, header):
+    """
+    Write data from an array to a FRED FGD file.
+    
+    Parameters
+    ----------
+        filename : str
+            Open the file object or filename.
+        
+        a : array_like
+            Array containing the data.
+            
+        header : dict
+            Header information preceding the actual data array in the FGD file.
+            The following items are available:
+                * PHYSICAL_MEANING: str, ``Unknown`` / ``Irradiance`` / etc.
+                * TITLE: str, title of the dependent axis (perpendicular to A and B)
+                * DATAUNITS: str, units of the dependent axis (arbitrary text)
+                * FRED_FILENAME: str, name of the FRED file the data originates from
+                * ORIGIN_POSITION: 3-element tuple/array with origin position
+                * HOLE_VALUE: ``1e+308``
+                * A_AXIS_MIN: float, negative limit of A axis
+                * A_AXIS_MAX: float, positive limit of A axis
+                * A_AXIS_DIM: int, number of data points in A direction
+                * A_AXIS_LABEL: str, title for the A axis
+                * A_AXIS_TYPE: str, ``Unknown`` / ``Spatial`` / etc.
+                * A_AXIS_UNITS: str, ``Unknown`` / ``mm`` / etc.
+                * A_AXIS_DIR: 3-element tuple/array with unit direction vector
+                * B_AXIS_MIN: float, negative limit of B axis
+                * B_AXIS_MAX: float, positive limit of B axis
+                * B_AXIS_DIM: int, number of data points in B direction
+                * B_AXIS_LABEL: str, title for the B axis
+                * B_AXIS_TYPE: str, ``Unknown`` / ``Spatial`` / etc.
+                * B_AXIS_UNITS: str, ``Unknown`` / ``mm`` / etc.
+                * B_AXIS_DIR: 3-element tuple/array with unit direction vector
+    
+    Note
+    ----
+        Binary mode does not work yet. File export is always in text mode.
+    """
+
+    header["BINARY"] = False
+    header["DATETIME"] = time.strftime("%A, %B %d, %Y %H:%M:%S")
+    
+    f = open(filename, "w")
+    header_str = "FRED_DATA_FILE\n"
+    for key in header:
+        header_str += key + "= " + str(header[key]).strip(" []") + "\n"
+    header_str += "BeginData\n"
+    f.write(header_str)
+    a.tofile(f, sep=" ")
+    f.close()
+    
