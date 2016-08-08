@@ -5,9 +5,10 @@ Created on Mon Jul 11 15:51:05 2016
 @author: ulip
 """
 
-import io
 import time
+import glob
 import numpy as np
+import scipy.misc
 
 
 def fgd2array(f, header_info=False):
@@ -192,4 +193,64 @@ def array2fgd(filename, a, header):
     f.write(header_str)
     a.tofile(f, sep=" ")
     f.close()
+
+
+def fgd2image(pattern, extension="png", ref_radiance=None, ref_gray=255):
+    """
+    Convert FRED FGD file into image file.
     
+    Parameters
+    ----------
+        pattern : str
+            File name pattern for file(s) to convert. This may include
+            wildcards to match multiple files.
+        
+        extension : str
+            Extension of the target image file. This determines the image format
+            of the target file.
+        
+        ref_radiance : float
+            Radiance value that is the common normalization reference for all
+            converted files. If ``None`` the reference radiance is the maximum
+            of each converted file individually.
+        
+        ref_gray : int
+            Gray value corresponding to the reference radiance.
+    
+    Returns
+    -------
+        count : int
+            Number of the converted files.
+    
+    Example
+    -------
+        >>> count = fgd2image("Camera_image_1.fgd", ref_radiance=0.001)
+        >>> print(count, "file(s) converted.")
+        1 file(s) converted.
+        >>> count = fgd2image("Camera_image_*.fgd", ref_radiance=0.001)
+        >>> print(count, "file(s) converted.")
+        5 file(s) converted.
+    """
+    count = 0
+    common_norm = False
+    if ref_radiance:
+        common_norm = True
+        
+    for filename in glob.glob(pattern):
+        data, header = fgd2array(filename, header_info=True)
+        data[data < 0.0] = 0.0
+        
+        if not common_norm:
+            ref_radiance = data.max()
+        
+        # normalize array to maximum gray value and clip values above 255
+        data = data / ref_radiance * ref_gray
+        data[data > 255] = 255
+        
+        # quantization to integer gray values
+        data = np.round(data).astype(np.int)
+        scipy.misc.imsave(filename[:-4] + "." + extension, data)
+        
+        count += 1
+        
+    return count
