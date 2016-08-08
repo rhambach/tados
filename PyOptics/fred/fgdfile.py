@@ -212,7 +212,8 @@ def fgd2image(pattern, extension="png", ref_radiance=None, ref_gray=255):
         ref_radiance : float
             Radiance value that is the common normalization reference for all
             converted files. If ``None`` the reference radiance is the maximum
-            of each converted file individually.
+            of each converted file individually (i.e. there is no common
+            reference).
         
         ref_gray : int
             Gray value corresponding to the reference radiance.
