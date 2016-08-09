@@ -250,7 +250,9 @@ def fgd2image(pattern, extension="png", ref_radiance=None, ref_gray=255):
         
         # quantization to integer gray values
         data = np.round(data).astype(np.int)
-        scipy.misc.imsave(filename[:-4] + "." + extension, data)
+        # scipy.misc.imsave() does rescales the gray value range to 0-255 so
+        # we use scipy.misc.toimage().save() with cmin=0 and cmax=255 instead
+        scipy.misc.toimage(data, cmin=0, cmax=255).save(filename[:-4] + "." + extension)
         
         count += 1
         
