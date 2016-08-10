@@ -25,8 +25,8 @@ def fgd2array(f, header_info=False):
     
     Example
     -------
-        >>> import fred.fgdfile
-        >>> data, header = fred.fgdfile.from_fgd("datafile.fgd", header_info=True)
+        >>> from PyOptics.fred.fgdfile import fgd2array
+        >>> data, header = fgd2array("datafile.fgd", header_info=True)
         >>> header
         {'ORIGIN_POSITION': array([ -34.86855408,  -98.8746984 ,  171.25600122]),
         'TITLE': '', 'B_AXIS_MIN': -2.7135, 'A_AXIS_MAX': 3.392, 'B_AXIS_TYPE': 'Spatial',
@@ -225,6 +225,7 @@ def fgd2image(pattern, extension="png", ref_radiance=None, ref_gray=255):
     
     Example
     -------
+        >>> from PyOptics.fred.fgdfile import fgd2image  
         >>> count = fgd2image("Camera_image_1.fgd", ref_radiance=0.001)
         >>> print(count, "file(s) converted.")
         1 file(s) converted.
