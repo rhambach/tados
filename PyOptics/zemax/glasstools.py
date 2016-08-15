@@ -210,7 +210,6 @@ def read_agf_file(filename, encoding='ascii'):
             try:
                 line = line.strip().split(" ", 1)
                 field = line[0].upper()
-                print name
                 if field == 'CC':
                     comment = line[-1]
                 elif field == 'NM':
@@ -319,9 +318,9 @@ def abbe_plot(catalog, wave1=0.4861327, wave2=0.5875618, wave3=0.6562725):
     for glass in catalog:
         n = index(catalog[glass], wave2)
         v = abbe(catalog[glass], wave1, wave2, wave3)
-        point, = plt.plot(v, n, 'o', markersize=10, markerfacecolor=fc[catalog[glass]['status']])
+        point, = plt.plot(v, n, 'o', markersize=10, markerfacecolor=fc[catalog[glass]['status']], label='test')
         annotation = ax.annotate("%s $nd$=%f $vd$=%f" % (glass, n, v),
-                                 xy=(v, n), xycoords='data',xytext=(v - 2.5, n), textcoords='data', horizontalalignment="left",
+                                 xy=(v, n), xycoords='data',xytext=(v, n), textcoords='data', horizontalalignment="left",
                                  bbox=dict(boxstyle="round", facecolor="w", edgecolor="0.5", alpha=0.9))
                                  
         # by default, disable the annotation visibility
@@ -351,6 +350,7 @@ def abbe_plot(catalog, wave1=0.4861327, wave2=0.5875618, wave3=0.6562725):
             plt.draw()
     
     on_move_id = fig.canvas.mpl_connect('motion_notify_event', on_move)
+    plt.legend()
     plt.tight_layout()
     plt.show()
     
@@ -360,9 +360,9 @@ if __name__ == "__main__":
     
     home = expanduser("~")
     
-    wave1 = 0.4
-    wave2 = 0.6
-    wave3 = 0.90
+    wave1 = 0.8
+    wave2 = 0.85
+    wave3 = 0.9
     
     filename = home + r"\Documents\Zemax\Glasscat\schott.agf"
     print filename
