@@ -10,6 +10,7 @@ diagram for an arbitrary set of wavelengths.
 
 import codecs
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Cursor
 
@@ -174,8 +175,13 @@ def read_agf_file(filename, encoding='ascii'):
             
     Example
     -------
-        >>> cat = read_agf_file("schott.agf")
-        >>> cat
+        >>> from os.path import expanduser
+        >>> # get user's home directory
+        >>> home = expanduser("~")
+        >>> glass_dir = home + r"\Documents\Zemax\Glasscat\"
+        >>> # Read glass catalog file
+        >>> catalog = read_agf_file(glass_dir + "schott.agf")
+        >>> catalog
         {'F2': {  'ar': 2.3,
                   'cr': 1.0,
                   'density': 3.599,
@@ -294,9 +300,13 @@ def abbe_plot(catalog, wave1=0.4861327, wave2=0.5875618, wave3=0.6562725):
     
     Example
     -------
+        >>> from os.path import expanduser
+        >>> # get user's home directory
+        >>> home = expanduser("~")
+        >>> glass_dir = home + r"\Documents\Zemax\Glasscat\"
         >>> # Read glass catalog file
-        >>> catalog = read_agf_file("schott.agf")
-        >>> # "Abbe" diagram for near-infrared
+        >>> catalog = read_agf_file(glass_dir + "schott.agf")
+        >>> # "Abbe" diagram for some near-infrared wavelengths
         >>> abbe_plot(catalog, 0.8, 0.85, 0.9)
     """
     fig = plt.figure(figsize=(8, 6)) # facecolor='white'
@@ -313,23 +323,23 @@ def abbe_plot(catalog, wave1=0.4861327, wave2=0.5875618, wave3=0.6562725):
           'Preferred': 'green',
           'Obsolete': 'red',
           'Special': 'blue',
-          'Melt': 'yellow'}
+          'Melt': 'orange'}
 
     for glass in catalog:
         n = index(catalog[glass], wave2)
         v = abbe(catalog[glass], wave1, wave2, wave3)
         point, = plt.plot(v, n, 'o', markersize=10, markerfacecolor=fc[catalog[glass]['status']])
-        annotation = ax.annotate("%s $nd$=%f $vd$=%f" % (glass, n, v),
+        annotation = ax.annotate("%s nd = %5.3f vd = %4.1f" % (glass, catalog[glass]['nd'], catalog[glass]['vd']),
                                  xy=(v, n), xycoords='data',xytext=(v, n), textcoords='data', horizontalalignment="left",
                                  bbox=dict(boxstyle="round", facecolor="w", edgecolor="0.5", alpha=0.9))
-                                 
+     
         # by default, disable the annotation visibility
         annotation.set_visible(False)
         points_with_annotation.append([point, annotation])
     
     ax.set_xlim(ax.get_xlim()[1], ax.get_xlim()[0])  # extend of abbe number(Vd)
     ax.set_ylim(1.4, 2.1) # extend of index(Nd)
-    ax.set_title('Modified Abbe diagram')
+    ax.set_title('Modified Abbe diagram', fontsize=20)
     s1 = "n({}) - 1".format(wave2)
     s2 = "n({}) - n({})".format(wave1, wave3)
     ax.set_xlabel(r'Equivalent Abbe number $\nu = \frac{' + s1 + '}{' + s2 + '}$', fontsize=16)
@@ -350,6 +360,9 @@ def abbe_plot(catalog, wave1=0.4861327, wave2=0.5875618, wave3=0.6562725):
             plt.draw()
     
     on_move_id = fig.canvas.mpl_connect('motion_notify_event', on_move)
+    # make an arbitrary legend for the glass status
+    dummy_lines = [matplotlib.lines.Line2D([0], [0], linestyle='none', marker='o', markerfacecolor=fc[item], label=item) for item in fc.keys()]
+    ax.legend(dummy_lines, fc.keys(), numpoints=1, loc='upper left', fontsize=14)
     plt.tight_layout()
     plt.show()
     
@@ -359,12 +372,11 @@ if __name__ == "__main__":
     
     home = expanduser("~")
     
-    wave1 = 0.8
+    wave1 = 0.750
     wave2 = 0.85
-    wave3 = 0.9
-    
+    wave3 = 0.920
+       
     filename = home + r"\Documents\Zemax\Glasscat\schott.agf"
-    print filename
     
     cat = read_agf_file(filename, encoding='ascii')
     abbe_plot(cat, wave1, wave2, wave3)
