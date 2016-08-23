@@ -30,7 +30,7 @@ def plot_polygon(Nverts,Nreflections,Nrays,start=(0.5,0.137)):
   # raytrace
   print("Perform Raytrace ...")
   tracer = rt.Raytracer(source,system);
-  tracer.trace(nRays=100);
+  tracer.trace(nRays=Nrays);
   
   # plotting
   # see http://exnumerus.blogspot.de/2011/02/how-to-quickly-plot-multiple-line.html      
