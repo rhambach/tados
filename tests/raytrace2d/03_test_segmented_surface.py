@@ -10,6 +10,7 @@ import matplotlib.pylab as plt
 
 import _set_pkgdir
 import PyOptics.raytrace2d as rt
+from PyOptics.raytrace2d.view import SimpleLayout
 
 def get_reference_system(Nreflections):
   " build zigsag system from single Segments"
@@ -65,18 +66,10 @@ def test_zigsag_mirror_system(Nreflections,nRays=1):
     print("Perform Raytrace #%d ..."%n)
     tracer = rt.Raytracer(source,system);
     tracer.trace(nRays=nRays);
+    SimpleLayout(tracer,ax=ax[n]).plot(color='b',marker='.');
     
-    # extract list of z and y values from raypath
-    pos = np.array([(rays.z,rays.y) for rays in tracer.raypath]);  # shape (npoints,2,nrays)   
-    ax[n].plot(pos[:,0],pos[:,1],'b',marker='.');
-  
-    # plot surfaces
-    for surface in system:
-      y,x = surface.get_surface_data();  
-      ax[n].plot(x,y,'k-');
-
-    ax[n].set_aspect('equal')  
-  
+  ax[0].set_title("Reference: SingleSurface");
+  ax[1].set_title("Test: SegmentedSurface")
   return fig;
   
 if __name__ == '__main__':

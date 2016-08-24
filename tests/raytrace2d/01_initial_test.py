@@ -4,6 +4,8 @@ import matplotlib.pylab as plt
 
 import _set_pkgdir
 import PyOptics.raytrace2d as rt
+from PyOptics.raytrace2d.view import SimpleLayout,Footprint
+
 # source
 source = rt.CollimatedBeam(10,0,10,n=1);
 
@@ -20,6 +22,6 @@ system.append( rt.PropagateDistance(-35) ); # negative distance after mirror (pr
 tracer = rt.Raytracer(source,system);
 tracer.print_system(verbosity=1);
 tracer.trace(nRays=7);
-tracer.plot_raypath(color='b',marker='.');
+SimpleLayout(tracer).plot(show_vignetted=True,marker='.');
 plt.show();
   

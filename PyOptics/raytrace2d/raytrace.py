@@ -61,6 +61,7 @@ class Raytracer(object):
     self.system=system;
     self.source=source;
     self.raypath=[];
+    self.vignetted_at_surf=[];
     
   def trace(self,nRays=7):
     " trace number of rays"
@@ -78,79 +79,6 @@ class Raytracer(object):
       if np.any(vig):
         self.vignetted_at_surf[vig] = np.minimum(self.vignetted_at_surf[vig], num);
   
-      
-  def plot_raypath(self,show_vignetted=True,show_surfaces=True,**kwargs):
-    """
-    Plot system layout and results of last raytrace
-    
-    Parameters
-    ----------
-      show_vignetted : bool, optional
-        shows raypath of vignetted rays, default: True
-      show_surfaces : bool, optional
-        shows surfaces of system, default: True
-      **kwargs : keyword arguments
-        further arguments are passed on to the matplotlib plot() function
-    """   
-    if not self.raypath: 
-      raise RuntimeError("raypath is empty. First run a raytrace before plotting.");
-    
-    from matplotlib.lines import Line2D      
-    # setup plot
-    fig,ax = plt.subplots(1,1);
-    ax.set_title("System Layout");
-    ax.set_xlabel("position z along optical axis");
-    ax.set_ylabel("ray height y");
-    # extract list of z and y values from raypath
-    pos = np.array([(rays.z,rays.y) for rays in self.raypath]);  # shape (nPoints,2,nrays)   
-    # iterate over all rays
-    for i in xrange(pos.shape[2]):
-      s = self.vignetted_at_surf[i];  # last surface of unvignetted ray
-                                      # corresponds to index s+1 in raypath (source is 0)
-      if s<=len(self.system):
-        ax.add_line(Line2D(pos[:s+1,0,i],pos[:s+1,1,i],ls='-',**kwargs));
-        if show_vignetted: 
-          ax.add_line(Line2D(pos[s:,0,i],pos[s:,1,i],ls=':',**kwargs));
-      else:
-        ax.add_line(Line2D(pos[:,0,i],pos[:,1,i],**kwargs));
-    
-    # plot surfaces
-    if show_surfaces:    
-      for surface in self.system:
-        y,z = surface.get_surface_data();
-        if y is not None:
-          ax.plot(z,y,'k-');
-      ax.set_aspect('equal')  
-    return ax;
-    
-  def plot_footprint(self,surf=-1,**kwargs):
-    """
-    Plot intersection points of all rays with specified surface.
-    
-    Parameters
-    ----------
-      surf : integer, optional
-        surface number in system, default: -1 corresponding to last surface 
-      **kwargs : keyword arguments
-        further arguments are passed on to the matplotlib hist() function
-    """
-    if not self.raypath: 
-      raise RuntimeError("raypath is empty. First run a raytrace before plotting."); 
-
-    if surf<0: surf+=len(self.system);    
-    # setup plot
-    fig,(ax1,ax2) = plt.subplots(1,2,sharey=True);
-    fig.suptitle("Surf%2d: %s"%(surf,self.system[surf].info()));
-    ax1.set_xlabel("position z along optical axis");    
-    ax2.set_ylabel("ray height y at surface");    
-    ax2.set_xlabel("counts");
-    # extract list of z and y values from raypath    
-    rays=self.raypath[surf+1];
-    ax1.plot(rays.z,rays.y,'.',alpha=0.1);
-    ax2.hist(rays.y,orientation="horizontal",**kwargs);
-    return (ax1,ax2);    
-
-    
   def print_system(self,verbosity=0):
     print("Source   %s"%self.source.info(verbosity))
     for i,surface in enumerate(self.system):

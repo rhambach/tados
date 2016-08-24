@@ -230,7 +230,7 @@ class SegmentedSurface(Surface):
       beta = (-rays.vy*(rays.z-Az)+rays.vz*(rays.y-Ay))/det;
 
       # select only rays that intersect the current segment, stop if no ray hits segment
-      bHit = np.logical_and(beta>0, beta<1);    
+      bHit = np.logical_and(beta>=0, beta<1);    
       if not np.any(bHit): continue;
       beta = beta[bHit]
       rvz = rays.vz[bHit]; rvy = rays.vy[bHit];
