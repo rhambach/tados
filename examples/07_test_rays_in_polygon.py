@@ -33,29 +33,14 @@ def plot_polygon(Nverts,Nreflections,Nrays,start=(0.5,0.137)):
   tracer.trace(nRays=Nrays);
   
   # plotting
-  # see http://exnumerus.blogspot.de/2011/02/how-to-quickly-plot-multiple-line.html      
   print("Plot Results ...")
-  from matplotlib.collections import LineCollection
-  # setup plot
-  fig,ax = plt.subplots(1,1);
-  ax.set_title("Billiard for regular %d-Polygon (%d rays, %d reflections)"%(Nverts,Nrays,Nreflections));
-  # extract list of z and y values from raypath
-  pos = np.array([(rays.z,rays.y) for rays in tracer.raypath]);  # shape (nPoints,2,nrays)   
-  # iterate over all rays
-  nPoints,_,nRays = pos.shape;
-  
-  # alpha should not be too small: https://github.com/matplotlib/matplotlib/issues/2287/
-  pos = np.rollaxis(pos,2); # shape (nRays,nPoints,2)
-  lines = np.stack([pos[:,:-1,:],pos[:,1:,:]],axis=2); # shape (nRays,nPoints,2,2)
+  SL=rt.SimpleLayout(tracer);  
   alpha = max(0.01, min(1.,256./Nrays/Nreflections));    # estimate opacity between 1 and 0.01
-  linecol = LineCollection(lines.reshape(-1,2,2),alpha=alpha);
-  ax.add_collection(linecol)
-  
-  # plot surfaces
-  y,x = system[0].get_surface_data();
-  ax.plot(x,y,'k-');
-  ax.set_aspect('equal')  
-  plt.show();
+  SL.plot_rays(alpha=alpha);
+  SL.plot_system(ind=slice(0,1));  
+  SL.ax.set_title("Billiard for regular %d-Polygon (%d rays, %d reflections)"%(Nverts,Nrays,Nreflections));
+   
+  return SL
   
 if __name__ == '__main__':
   
@@ -65,3 +50,6 @@ if __name__ == '__main__':
     start=(0.5,0.137);       # coordinates of starting point
     print("###### %d Polygon ####################################"%Nverts)
     plot_polygon(Nverts,Nreflections,Nrays,start);
+    
+  plt.show();
+  

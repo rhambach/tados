@@ -51,7 +51,7 @@ class View(object):
     return self.ax;    
 
   @abc.abstractmethod
-  def plot_rays(self,show_vignetted=True,**kwargs):
+  def plot_rays(self,show_vignetted=True,ind=None):
     """
     Plots raypath only.
         
@@ -59,8 +59,10 @@ class View(object):
     ----------
       show_vignetted : bool, optional
         shows raypath of vignetted rays, default: True
+      ind : slice object, optional
+        indicates indices of ray segments to plot, default: all
       **kwargs : keyword arguments
-        further arguments are passed on to the matplotlib plot() function
+        further arguments are passed on to the matplotlib plot() function 
     """   
     return;
    
@@ -72,8 +74,12 @@ class View(object):
     ----------
       show_vignetted : bool, optional
         shows raypath of vignetted rays, default: True
+      ind : slice object, optional
+        indicates indices of surfaces to plot, default: all
+      hind : slice object, optional
+        indicates indices of surfaces to highlight, default: none
       **kwargs : keyword arguments
-        further arguments are passed on to the matplotlib plot() function for the ray-plot
+        further arguments are passed on to the matplotlib plot() function for the ray plot
     """   
     self.plot_rays(show_vignetted=show_vignetted,**kwargs);
     self.plot_system(ind=ind,hind=hind);
@@ -94,24 +100,36 @@ class SimpleLayout(View):
         axes for plotting, default: a new figure is created
     """
     super(SimpleLayout,self).__init__(tracer,ax=ax);
-    self.ax.set_title("System Layout");
+    self.ax.set_title("System Layout (%d rays)"%self.nRays);
     
-  def plot_rays(self,show_vignetted=True,**kwargs):
-    pos=self.points;
-    # iterate over all rays
-    for i in xrange(self.nRays):
-      s = self.vignetted_at_surf[i];  # last surface of unvignetted ray
-                                      # corresponds to index s+1 in raypath (source is 0)
-      if s<=len(self.system):
-        self.ax.add_line(Line2D(pos[i,:s+1,0],pos[i,:s+1,1],ls='-',**kwargs));
-        if show_vignetted: 
-          self.ax.add_line(Line2D(pos[i,s:,0],pos[i,s:,1],ls=':',**kwargs));
-      else:
-        self.ax.add_line(Line2D(pos[i,:,0,i],pos[i,:,1],**kwargs));
+  def plot_rays(self,show_vignetted=True,alpha=None,ind=None,**kwargs):
     
-  
+    # estimate opacity between 1 and 0.01        
+    if alpha is None: alpha = 256./self.nRays/self.nPoints;    
+    alpha = min(max(alpha,1./256),1);
 
-class Footprint(View):
+    # plot many ray semgemnts efficiently with matplotlib's LineCollection    
+    # see http://exnumerus.blogspot.de/2011/02/how-to-quickly-plot-multiple-line.html      
+    lines = np.stack([self.points[:,:-1,:],self.points[:,1:,:]],axis=2); # shape (nRays,nPoints-1,2,2)
+
+    # index vignetted ray segments
+    surf_num = np.arange(self.nPoints-1);
+    vig = surf_num[np.newaxis,:] >= self.vignetted_at_surf[:,np.newaxis]; # shape (nRays,nPoints-1);
+     
+    # plot unvignetted rays
+    linecol = LineCollection(lines[~vig],alpha=alpha,color='blue',**kwargs);
+    self.ax.add_collection(linecol)
+
+    # plot vignetted rays    
+    if show_vignetted:
+      linecol = LineCollection(lines[vig],alpha=alpha,color='red',**kwargs);
+      self.ax.add_collection(linecol)
+      
+    # update
+    self.ax.figure.canvas.draw();
+
+    
+class Footprint(SimpleLayout):
 
   def __init__(self,tracer,surf=-1):
     """
@@ -138,17 +156,16 @@ class Footprint(View):
  
   def plot_system(self,ind=None,hind=None,**kwargs):
     self.ax=self.ax1;
-    self.ax.set_title("System Layout");
     super(Footprint,self).plot_system(ind=slice(0,self.surf+1),hind=slice(self.surf,self.surf+1),**kwargs);
       
   def plot_rays(self,show_vignetted=True,**kwargs):
-    # extract list of z and y values from raypath    
-    x,y=self.points[:,:self.surf+2].T;             # shape (nSurfaces,nRays)
+    # plot SystemLayout
+    self.ax=self.ax1;
+    super(Footprint,self).plot_rays(show_vignetted=show_vignetted,ind=slice(0,self.surf+1));
+    # plot Footprint
+    y=self.points[:,self.surf+1,1];                # shape (nRays,)
     vig = self.vignetted_at_surf <= self.surf;
-    alpha = max(0.01, min(1.,256./self.nRays));    # estimate opacity between 1 and 0.01
-    self.ax1.plot(x[:,~vig],y[:,~vig],'b-',alpha=alpha);
-    if show_vignetted: self.ax1.plot(x[0,vig],y[0,vig],'r.');
-    self.ax2.hist(y[-1,~vig],orientation="horizontal",**kwargs);
+    self.ax2.hist(y[~vig],orientation="horizontal",**kwargs);
    
     
     

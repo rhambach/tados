@@ -5,7 +5,7 @@ import matplotlib.pylab as plt
 
 import _set_pkgdir
 import PyOptics.raytrace2d as rt
-from PyOptics.raytrace2d.view import SimpleLayout,Footprint
+
 
 # source
 source = rt.CollimatedBeam(20,-10,0,n=1);
@@ -26,10 +26,10 @@ system.append( rt.PlaneSurface((-1,f),(1,f),n=-1))
 tracer = rt.Raytracer(source,system);
 tracer.print_system(verbosity=1);
 tracer.trace(nRays=11);
-SimpleLayout(tracer).plot(marker='.');
+rt.SimpleLayout(tracer).plot();
 
 # plot spot
 tracer.trace(nRays=1001);       # number should not be commensurable with number of segments N
-Footprint(tracer,surf=-1).plot(bins=50);
+rt.Footprint(tracer,surf=-1).plot(bins=50);
 plt.show();
   

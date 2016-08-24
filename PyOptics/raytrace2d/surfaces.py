@@ -185,7 +185,7 @@ class SegmentedSurface(Surface):
     self.z = init_list1d(z,self.num,np.double,'z');
     self.n_after=n;
     self.allow_virtual = allow_virtual;
-    
+
   def info(self,verbosity=0):
     descr = "Segmented Surface";
     if self.n_after is None: descr="Dummy " + descr;
@@ -227,8 +227,9 @@ class SegmentedSurface(Surface):
       # see PlaneSurface.trace_behind() for explanation
       sy = By-Ay;       sz = Bz-Az;
       det = rays.vz*sy-rays.vy*sz;      # corresponds to cross product (vxs) between ray and surface segment, 
-      beta = (-rays.vy*(rays.z-Az)+rays.vz*(rays.y-Ay))/det;
-
+      with np.errstate(divide='ignore'):# divide by zero if ray and surface is parallel
+        beta = (-rays.vy*(rays.z-Az)+rays.vz*(rays.y-Ay))/det;  
+            
       # select only rays that intersect the current segment, stop if no ray hits segment
       bHit = np.logical_and(beta>=0, beta<1);    
       if not np.any(bHit): continue;
@@ -271,6 +272,9 @@ class SegmentedSurface(Surface):
       ret.vz[bHit]=vzp; ret.vy[bHit]=vyp;
       vig[bHit]=False;   # not vignetted if we hit segment
     
+    # set vignetted rays to initial starting point
+    ret.z[vig] = rays.z[vig]; ret.vz[vig] = rays.vz[vig];
+    ret.y[vig] = rays.y[vig]; ret.vy[vig] = rays.vy[vig];
     return ret,vig;
     
   def get_refractive_index(self,n_before):
