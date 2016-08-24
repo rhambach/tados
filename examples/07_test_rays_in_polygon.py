@@ -34,19 +34,20 @@ def plot_polygon(Nverts,Nreflections,Nrays,start=(0.5,0.137)):
   
   # plotting
   print("Plot Results ...")
-  SL=rt.SimpleLayout(tracer);  
+  PL=rt.PlotPropagation(tracer);  
+  opl = PL.get_max_opl();
   alpha = max(0.01, min(1.,256./Nrays/Nreflections));    # estimate opacity between 1 and 0.01
-  SL.plot_rays(alpha=alpha);
-  SL.plot_system(ind=slice(0,1));  
-  SL.ax.set_title("Billiard for regular %d-Polygon (%d rays, %d reflections)"%(Nverts,Nrays,Nreflections));
+  PL.plot_rays(opl,alpha=alpha);
+  PL.plot_system(ind=slice(0,1));  
+  PL.ax.set_title("Billiard for regular %d-Polygon (%d rays, %d reflections)"%(Nverts,Nrays,Nreflections));
    
-  return SL
+  return PL
   
 if __name__ == '__main__':
   
-  for Nverts in (5,8,1000):  # number of vertices of polygon
-    Nreflections=100;        # reflections inside polygon
-    Nrays=100;               # number of rays
+  for Nverts in (5,):#8,1000):  # number of vertices of polygon
+    Nreflections=3;        # reflections inside polygon
+    Nrays=1001;               # number of rays
     start=(0.5,0.137);       # coordinates of starting point
     print("###### %d Polygon ####################################"%Nverts)
     plot_polygon(Nverts,Nreflections,Nrays,start);

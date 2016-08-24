@@ -159,7 +159,7 @@ class Footprint(SimpleLayout):
     super(Footprint,self).plot_system(ind=slice(0,self.surf+1),hind=slice(self.surf,self.surf+1),**kwargs);
       
   def plot_rays(self,show_vignetted=True,**kwargs):
-    # plot SystemLayout
+    # plot rays in SystemLayout
     self.ax=self.ax1;
     super(Footprint,self).plot_rays(show_vignetted=show_vignetted,ind=slice(0,self.surf+1));
     # plot Footprint
@@ -167,6 +167,54 @@ class Footprint(SimpleLayout):
     vig = self.vignetted_at_surf <= self.surf;
     self.ax2.hist(y[~vig],orientation="horizontal",**kwargs);
    
+   
+class PlotPropagation(SimpleLayout):
+
+  def __init__(self,tracer,ax=None):
+    """
+    Plot propagation of light according to the results of last raytrace up to fixed OPL.
     
+    Parameters
+    ----------
+      tracer : instance of Raytrace
+        optical system and results of last raytrace (Raytrace.trace() must be executed once)
+      ax     : instance of matplotlib.Axes, optional
+        axes for plotting, default: a new figure is created
+    """
+    super(PlotPropagation,self).__init__(tracer,ax=ax);
+    self.points_orig = self.points.copy();            # shape (nRays,nPoints,2)
+    # calculate OPL
+    self.opl_segment = np.linalg.norm( self.points[:,:-1,:]-self.points[:,1:,:], axis=2); 
+    self.opl_segment*= np.abs(tracer.n);              # shape (nRays,nPoints-1)
+    self.opl = np.cumsum(self.opl_segment,axis=1);    # shape (nRays,nPoints-1)
+      
+  def get_max_opl(self):
+    vig = self.vignetted_at_surf < len(self.system);
+    return np.min(self.opl[~vig,-1]);
+
+  def __restrict_raypath_to_opl(self,opl):
+    " change self.points such that all rays stop at same maximum OPL"
+    self.points=self.points_orig.copy();  # reset to initial state
+    if opl > self.get_max_opl():
+      raise RuntimeError('opl should be larger than %f.'%self.get_max_opl());
+    # search first ray segment at which opl is exceeded (between points[ind] and points[ind+1])
+    ind = np.argmax(opl<=self.opl,axis=1);   # 0 <= ind < nPoints-1
+    ind_rays = np.arange(self.nRays);
+    exceed_opl = self.opl[ind_rays,ind]-opl 
+    assert np.all(exceed_opl>=0), "exceed_opl should be larger than zero"
+    assert np.all(exceed_opl<self.opl_segment[ind_rays,ind]), "exceed_opl should be smaller than opl of next segment"
+    # correct end-point of first ray-segment beyond OPL to match exactly the required opl
+    end = self.points[ind_rays,ind+1];
+    start = self.points[ind_rays,ind];
+    t = exceed_opl / self.opl_segment[ind_rays,ind];
+    t = t[:,np.newaxis];
+    self.points[ind_rays,ind+1] = t*start + (1-t)*end;
+    # remove points beyond opl
+    self.vignetted_at_surf = ind+1;    
+        
+  def plot_rays(self,opl,show_vignetted=False,**kwargs):
+    self.__restrict_raypath_to_opl(opl);
+    super(PlotPropagation,self).plot_rays(show_vignetted=False);
     
+
     
