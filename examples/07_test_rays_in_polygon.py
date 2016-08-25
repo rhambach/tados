@@ -45,9 +45,9 @@ def plot_polygon(Nverts,Nreflections,Nrays,start=(0.5,0.137)):
   
 if __name__ == '__main__':
   
-  for Nverts in (5,):#8,1000):  # number of vertices of polygon
-    Nreflections=3;        # reflections inside polygon
-    Nrays=1001;               # number of rays
+  for Nverts in (5,8,1000):  # number of vertices of polygon
+    Nreflections=100;        # reflections inside polygon
+    Nrays=200;               # number of rays
     start=(0.5,0.137);       # coordinates of starting point
     print("###### %d Polygon ####################################"%Nverts)
     plot_polygon(Nverts,Nreflections,Nrays,start);

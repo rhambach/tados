@@ -114,7 +114,7 @@ class PointSource(Source):
         list of collimated rays, beam center on axis at z, ray angle u
     """
     bFullAngle = np.allclose(self.amax-self.amin,360);
-    angles = np.linspace(self.amin,self.amax,nRays,endpoint=~bFullAngle);
+    angles = np.linspace(self.amin,self.amax,nRays,endpoint=not bFullAngle);
     vz= np.cos(np.deg2rad(angles));
     vy= np.sin(np.deg2rad(angles));
     return raytrace.Rays(z=self.z,y=self.y,vz=vz,vy=vy);

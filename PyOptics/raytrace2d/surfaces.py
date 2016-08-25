@@ -216,7 +216,7 @@ class SegmentedSurface(Surface):
     ret = Rays.empty(rays.num);            
     vig = np.ones(rays.num,dtype=np.bool);
     alpha_last = np.full(rays.num,np.inf);
-       
+ 
     # iterate over all segments
     for i in xrange(self.num-1):
 

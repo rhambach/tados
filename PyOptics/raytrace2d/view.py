@@ -183,26 +183,34 @@ class PlotPropagation(SimpleLayout):
     """
     super(PlotPropagation,self).__init__(tracer,ax=ax);
     self.points_orig = self.points.copy();            # shape (nRays,nPoints,2)
+    self.vignetted_at_surf_orig = self.vignetted_at_surf.copy();
     # calculate OPL
     self.opl_segment = np.linalg.norm( self.points[:,:-1,:]-self.points[:,1:,:], axis=2); 
     self.opl_segment*= np.abs(tracer.n);              # shape (nRays,nPoints-1)
     self.opl = np.cumsum(self.opl_segment,axis=1);    # shape (nRays,nPoints-1)
       
   def get_max_opl(self):
-    vig = self.vignetted_at_surf < len(self.system);
+    vig = self.vignetted_at_surf_orig < len(self.system);
     return np.min(self.opl[~vig,-1]);
 
   def __restrict_raypath_to_opl(self,opl):
     " change self.points such that all rays stop at same maximum OPL"
     self.points=self.points_orig.copy();  # reset to initial state
+    self.vignetted_at_surf=self.vignetted_at_surf_orig.copy();
+    
     if opl > self.get_max_opl():
       raise RuntimeError('opl should be larger than %f.'%self.get_max_opl());
     # search first ray segment at which opl is exceeded (between points[ind] and points[ind+1])
-    ind = np.argmax(opl<=self.opl,axis=1);   # 0 <= ind < nPoints-1
+    ind = np.argmax(opl<=self.opl,axis=1);              # 0 <= ind < nPoints-1
     ind_rays = np.arange(self.nRays);
     exceed_opl = self.opl[ind_rays,ind]-opl 
-    assert np.all(exceed_opl>=0), "exceed_opl should be larger than zero"
+    
+    # remove vignetted rays ()
+    unvig = exceed_opl >= 0;                            # if ray is vignetted, exceed_opl gets negative
+    if np.all(~unvig): return                           # all rays are vignetted at this opl - nothing to do
+    ind=ind[unvig]; ind_rays=ind_rays[unvig]; exceed_opl=exceed_opl[unvig];
     assert np.all(exceed_opl<self.opl_segment[ind_rays,ind]), "exceed_opl should be smaller than opl of next segment"
+    
     # correct end-point of first ray-segment beyond OPL to match exactly the required opl
     end = self.points[ind_rays,ind+1];
     start = self.points[ind_rays,ind];
@@ -210,7 +218,7 @@ class PlotPropagation(SimpleLayout):
     t = t[:,np.newaxis];
     self.points[ind_rays,ind+1] = t*start + (1-t)*end;
     # remove points beyond opl
-    self.vignetted_at_surf = ind+1;    
+    self.vignetted_at_surf[unvig] = ind+1;    
         
   def plot_rays(self,opl,show_vignetted=False,**kwargs):
     self.__restrict_raypath_to_opl(opl);
