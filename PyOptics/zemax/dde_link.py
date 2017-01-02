@@ -175,3 +175,60 @@ class DDElinkHandler(object):
     #           cmap='gray',extent=np.array([-1,1,-1,1])*imgSize/2);  
     
     return data,params
+
+
+
+
+  def zInterferogram(self,textFileName=None,timeout=None):
+    """
+    perform calculation of Interferogram in Zemax and return data as numpy array
+    
+    Parameters
+    ----------
+      textFileName : string, optional
+        name of the textfile used for extracting data from Zemax
+      timeout :      integer, optional
+        timeout in seconds
+      
+    Returns
+    ------
+      data :         2D array of shape (Nx,Ny)
+        interferogram intensity for each pixel [W/mm2] 
+      params :       dictionary
+        dictionary with parameters of the interferogram
+    """  
+    
+    # set up temporary name for analysis data
+    if textFileName is None:
+      fdir = _os.path.dirname(self.link.zGetFile());
+      textFileName = _os.path.join(fdir,'__pyzdde_InterferogramFile.txt');
+      
+    # perform Geometric Image Analysis (with current settings)
+    ret = self.link.zGetTextFile(textFileName,'Int',timeout=timeout);
+    assert ret == 0, 'zGetTextFile() returned error code {}'.format(ret) 
+    lines = pyz._readLinesFromFile(pyz._openFile(textFileName))
+    assert lines[0]=='Listing of Interferogram Data', "Output of Image analysis not found";
+    
+    # scan header
+    last_line_header = pyz._getFirstLineOfInterest(lines,'Xtilt');
+    params = [];  
+    for line in lines[1:last_line_header+1]:
+      pos = line.find(':');    
+      if pos>0: params.append((line[0:pos].strip(), line[pos+1:].strip()));
+    params=dict(params);  
+    # ... might be improved
+    
+    
+    # scan data (values in textfile are ordered like in Zemax Window, i.e.
+    #   with increasing column index, x increases from -imgSize/2 to imgSize/2
+    #   with increasing line   index, y decreases from imgSize/2 to -imgSize/2
+    first_line_data  = last_line_header+2;
+    # load text reads 2d matrix as index [line,column], corresponds here to [-y,x]
+    data = np.loadtxt(lines[first_line_data:]);
+    data = data[::-1].T;                           # reorder data as [x,y]
+    assert (data.shape[0]==data.shape[1]);         # Nx=Ny
+    #plt.figure()  
+    #plt.imshow(data.T,origin='lower',aspect='auto',interpolation='hanning',
+    #           cmap='gray',extent=np.array([-1,1,-1,1])*imgSize/2);  
+    
+    return data,params

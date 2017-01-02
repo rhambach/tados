@@ -11,7 +11,8 @@
 
 # location of the PyOptics package on the hard disk
 # (if not specified in PYTHONPATH)
-pkgdir = '../'; 
+pkgdir = ['../','../../PyZDDE/']; 
 import sys
 from   os.path import abspath;
-sys.path.insert(0,abspath(pkgdir));
+for p in pkgdir:
+  sys.path.insert(0,abspath(p));
