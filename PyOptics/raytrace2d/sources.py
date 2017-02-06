@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 
-import abc
+import abc, six
 import numpy as np
 from PyOptics.raytrace2d import raytrace
 
 # ToDo: add PointSource
 
-class Source(object, metaclass=abc.ABCMeta):
+@six.add_metaclass(abc.ABCMeta)    # backward compatible to 2.7
+class Source(object):
   " abstract base class for all sources, defines interface only "
   
   @abc.abstractmethod
