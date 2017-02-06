@@ -110,7 +110,7 @@ if __name__ == '__main__':
   
   # test different implementations of point in triangle
   for PIT in (PIT_crossproduct, PIT_barycentric, point_in_triangle):
-    print 'testing function %s ...' % (PIT.func_name)    
+    print('testing function %s ...' % (PIT.__name__))    
     test_few_points(points,triangles,PIT);
     test_image(image,triangles,PIT);
   

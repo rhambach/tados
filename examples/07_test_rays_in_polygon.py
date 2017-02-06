@@ -25,7 +25,7 @@ def plot_polygon(Nverts,Nreflections,Nrays,start=(0.5,0.137)):
   s=[0,0];
   s[0] = rt.SegmentedSurface(x[::-1],y[::-1],n=-1,allow_virtual=False);
   s[1] = rt.SegmentedSurface(x,y,n= 1,allow_virtual=False);
-  system = [s[i%2] for i in xrange(Nreflections)];
+  system = [s[i%2] for i in range(Nreflections)];
     
   # raytrace
   print("Perform Raytrace ...")

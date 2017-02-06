@@ -62,21 +62,21 @@ def handbook2(wavelength, param):
 def herzberger(wavelength, param):
     L = 1 / (wavelength**2 - 0.028)
     index = param[0] + param[1] * L + param[2] * L**2
-    for i in xrange(3, len(param)):
+    for i in range(3, len(param)):
         index += param[i] * wavelength**(2*(i-2))
 
 
 def schott(wavelength, param):
     index = param[0]
     index += param[1] * wavelength**2
-    for i in xrange(2, len(param)):
+    for i in range(2, len(param)):
         index += param[i] / wavelength**(2*(i-1))
     return np.sqrt(index)
 
 
 def sellmeier1(wavelength, param):
     index = 0.0
-    for i in xrange(0, len(param) // 2):
+    for i in range(0, len(param) // 2):
         index += param[2*i] * wavelength**2 / (wavelength**2 - param[2*i+1])
     return np.sqrt(index + 1)
 
@@ -242,7 +242,7 @@ def read_agf_file(filename, encoding='ascii'):
                     for p in line[-1].split(" "):
                         param.append(float(p))
                     # remove last parameters that are zero
-                    for i in xrange(1, len(param)):
+                    for i in range(1, len(param)):
                         if param[-1] != 0.0:
                             break
                         param.pop()
@@ -364,7 +364,7 @@ if __name__ == "__main__":
     wave3 = 0.9
     
     filename = home + r"\Documents\Zemax\Glasscat\schott.agf"
-    print filename
+    print(filename)
     
     cat = read_agf_file(filename, encoding='ascii')
     abbe_plot(cat, wave1, wave2, wave3)

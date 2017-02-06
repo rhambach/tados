@@ -27,8 +27,8 @@ def __test_intensity_footprint(hDDE):
     vigcode= ret[:,[1]];     
     xy    = ret[:,[2,3]];    
     # return (x,y) coordinates in image space    
-    xy   += image_size*(vigcode<>0);       # include vignetting by shifting ray outside image
-    xy[error<>0]=np.nan;                   # rays that could not be traced
+    xy   += image_size*(vigcode!=0);       # include vignetting by shifting ray outside image
+    xy[error!=0]=np.nan;                   # rays that could not be traced
     return xy;                             
 
 
@@ -77,7 +77,7 @@ def __test_angular_distribution(hDDE):
     error = ret[:,0];
     vigcode=ret[:,[1]];     
     kxky  = ret[:,[5,6]];                  # return (kx,ky) direction cosine in image space    
-    kxky[error<>0]=np.nan;                 # rays that could not be traced
+    kxky[error!=0]=np.nan;                 # rays that could not be traced
     return kxky;                             
 
   # field sampling (octagonal fiber, adaptive mesh)

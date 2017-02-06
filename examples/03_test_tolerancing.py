@@ -28,8 +28,8 @@ def __test_tolerancing(tol):
     vigcode= ret[:,[1]];     
     xy    = ret[:,[2,3]];    
     # return (x,y) coordinates in image space    
-    xy   += image_size*(vigcode<>0);       # include vignetting by shifting ray outside image
-    xy[error<>0]=np.nan;                   # rays that could not be traced
+    xy   += image_size*(vigcode!=0);       # include vignetting by shifting ray outside image
+    xy[error!=0]=np.nan;                   # rays that could not be traced
     return xy;                           
 
   # field sampling (octagonal fiber)

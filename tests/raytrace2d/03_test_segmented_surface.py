@@ -17,7 +17,7 @@ def get_reference_system(Nreflections):
   z =y%2;
   y-=0.5;
   system=[];
-  for ir in xrange(Nreflections-1):
+  for ir in range(Nreflections-1):
     i = int((ir+1)/2); # segment number at reflection: sequence 0,1,1,2,2,3,3,...
     offset = 1 if ir%4==0 or ir%4==1 else 0;  # offset sequence  1,1,0,0,1,1,0,...
     reverse= 1 if ir%4==1 or ir%4==2 else 0;  # orientation of surface, seq:  0,1,1,0,0,1,1,...
@@ -43,7 +43,7 @@ def get_test_system(Nreflections):
   s[0] = rt.SegmentedSurface(y,      z      ,n=-1,allow_virtual=False);
   s[1] = rt.SegmentedSurface(y[::-1],z[::-1],n= 1,allow_virtual=False);
   
-  return [s[i%2] for i in xrange(Nreflections)];
+  return [s[i%2] for i in range(Nreflections)];
 
 def test_zigsag_mirror_system(Nreflections,nRays=1):
 
@@ -62,7 +62,7 @@ def test_zigsag_mirror_system(Nreflections,nRays=1):
   
   for n,system in enumerate(systems):
     # raytrace
-    print("Perform Raytrace #%d ..."%n)
+    print("Perform Raytrace #%d ..."%n);
     tracer = rt.Raytracer(source,system);
     tracer.trace(nRays=nRays);
     rt.SimpleLayout(tracer,ax=ax[n]).plot();

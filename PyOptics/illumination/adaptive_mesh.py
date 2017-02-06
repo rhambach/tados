@@ -6,6 +6,7 @@ links: http://blancosilva.github.io/post/2014/10/28/Computational-Geometry-in-Py
 
 @author: Hambach
 """
+from __future__ import division
 import numpy as np
 import matplotlib.pylab as plt
 import logging
@@ -292,8 +293,8 @@ class AdaptiveMesh(object):
       for x in np.arange(0,nCA+1)/(nCA+1.):         # [0, 1/n, ..., (n-1)/n], at least [0,0.5]
         new_domain_points.append((1-x)*C + x*A);    # q_0, ..., q_nCA;
       # create new simplices (see figure above)
-      new_simplices.extend( [(q+i, q+i+1, p+i  ) for i in xrange(0,nCA)] ); # lower triangles
-      new_simplices.extend( [(p+i, q+i+1, p+i+1) for i in xrange(0,nCA)] ); # upper triangles
+      new_simplices.extend( [(q+i, q+i+1, p+i  ) for i in range(0,nCA)] ); # lower triangles
+      new_simplices.extend( [(p+i, q+i+1, p+i+1) for i in range(0,nCA)] ); # upper triangles
          
     # update points in mesh (points are no longer unique!)
     logging.debug("refining_skinny_triangles(): adding %d points"%len(new_domain_points));
@@ -651,7 +652,7 @@ class AdaptiveMesh(object):
     new_domain_points=[];
     new_image_points=[];
     new_simplices=[];
-    for k in xrange(nTriangles):    
+    for k in range(nTriangles):    
       # find index of first valid point p1 on CA and p2 on CB
       ind = np.any(np.isnan(image_points[:,:,k]),axis=-1);  # shape (nDivide,2)
       p1=np.where(~ind[:,0])[0][0];                   # first valid point on CA
@@ -700,7 +701,7 @@ class AdaptiveMesh(object):
     new_domain_points=[];
     new_image_points=[];
     new_simplices=[];
-    for k in xrange(nTriangles):    
+    for k in range(nTriangles):    
       # find index of first valid point p1 on CA and p2 on CB
       ind = np.any(np.isnan(image_points[:,:,k]),axis=-1);  # shape (nDivide,2)
       p1=np.where(~ind[:,0])[0][-1];                   # last valid point on CA

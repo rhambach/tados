@@ -75,7 +75,7 @@ class ToleranceSystem(object):
 
   
   def print_LDE(self,bShowDummySurfaces=False):
-    print self.ln.ipzGetLDE();
+    print(self.ln.ipzGetLDE());
 
   def print_current_geometric_changes(self):
     """
@@ -88,30 +88,30 @@ class ToleranceSystem(object):
     comment = self.__get_surface_comments();
     
     if np.all(dR==0) and np.all(dt==0):
-      print " system unchanged."
+      print(" system unchanged.")
       return
   
-    print "   surface     shift    tilt     comment"
-    for s in xrange(numSurf):
-      print "  %2d: "%s,
+    print("   surface     shift    tilt     comment")
+    for s in range(numSurf):
+      print("  %2d: "%s, end=' ')
       # check for translation (with precision of 10^-8 lens units)
       x,y,z=np.round(dt[s],decimals=8);
-      if   x==0 and y==0 and z==0: print "                    ",
-      elif x==0 and y==0 and z<>0: print "DZ: %5.3f,          "%z,
-      elif x==0 and y<>0 and z==0: print "DY: %5.3f,          "%y,
-      elif x<>0 and y==0 and z==0: print "DX: %5.3f,          "%x,
-      else:                        print "(%5.2f,%5.2f,%5.2f),"%(x,y,z),
+      if   x==0 and y==0 and z==0: print("                    ", end=' ')
+      elif x==0 and y==0 and z!=0: print("DZ: %5.3f,          "%z, end=' ')
+      elif x==0 and y!=0 and z==0: print("DY: %5.3f,          "%y, end=' ')
+      elif x!=0 and y==0 and z==0: print("DX: %5.3f,          "%x, end=' ')
+      else:                        print("(%5.2f,%5.2f,%5.2f),"%(x,y,z), end=' ')
       
       # check for rotations (with precision of 10^-8 lens units)
       x,y,z = np.round(np.linalg.norm(dR[s],axis=1),decimals=8);
-      if   x==0 and y==0 and z==0: print "    ",
-      elif x==0:                   print "XROT",
-      elif x==0 and y<>0 and z==0: print "YROT",
-      elif x<>0 and y==0 and z==0: print "ZROT",
-      else:                        print " ROT",
+      if   x==0 and y==0 and z==0: print("    ", end=' ')
+      elif x==0:                   print("XROT", end=' ')
+      elif x==0 and y!=0 and z==0: print("YROT", end=' ')
+      elif x!=0 and y==0 and z==0: print("ZROT", end=' ')
+      else:                        print(" ROT", end=' ')
       
-      if comment[s]: print "  (%s)"%(comment[s]);
-      else: print ""
+      if comment[s]: print("  (%s)"%(comment[s]));
+      else: print("")
     
   def tilt_decenter_surface(self,surf,xdec=0.0,ydec=0.0,xtilt=0.0,ytilt=0.0,ztilt=0.0,order=0):
     """

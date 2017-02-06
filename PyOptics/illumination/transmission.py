@@ -23,8 +23,7 @@ from PyOptics.illumination.point_in_triangle import point_in_triangle
 from PyOptics.illumination.adaptive_mesh import *
 from PyOptics.zemax.sampling import *
 
-class Detector(object):
-  __metaclass__ = abc.ABCMeta
+class Detector(object, metaclass=abc.ABCMeta):
   @abc.abstractmethod
   def add(self,mesh,bSkip=[],weight=1): return;
   @abc.abstractmethod  
@@ -249,7 +248,7 @@ class PolarImageDetector(Detector):
     # radial profile    
     radial_profile = np.empty(self.nrings);
     r = np.empty(self.nrings);
-    for i in xrange(self.nrings):
+    for i in range(self.nrings):
       radial_profile[i] = np.sum(self.intensity[Nr[i]:Nr[i+1]]) / self.points_per_ring[i];
       r2 = np.sum(self.points[:,Nr[i]:Nr[i+1]]**2,axis=0)
       assert np.allclose(r2[0],r2);
@@ -415,7 +414,7 @@ class Transmission(object):
       logging.info("Transmission for parameter: "+str(p));      
 
       # initialize adaptive grid for 
-      mapping = lambda(mesh_points): self.raytrace(p,mesh_points);
+      mapping = lambda mesh_points: self.raytrace(p,mesh_points);
       Mesh=AdaptiveMesh(self.mesh_points, mapping);  
       
       # subdivision of invalid triangles (raytrace failed for some vertices)
@@ -424,7 +423,7 @@ class Transmission(object):
       # iterative mesh refinement (subdivision of broken triangles)
       while True:  
         if ip==0: # plot mesh for first set of parameters
-          skip = lambda(simplices): Mesh.find_broken_triangles(simplices=simplices,lthresh=lthresh)        
+          skip = lambda simplices: Mesh.find_broken_triangles(simplices=simplices,lthresh=lthresh)        
           Mesh.plot_triangulation(skip_triangle=skip);
         # refine mesh until nothing changes
         nNew = Mesh.refine_broken_triangles(is_broken,nDivide=100,bPlot=(ip==0));        

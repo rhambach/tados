@@ -29,8 +29,8 @@ def analyze_transmission(hDDE):
     vigcode= ret[:,[1]];     
     xy    = ret[:,[2,3]];    
     # return (x,y) coordinates in image space    
-    xy   += image_size*(vigcode<>0);       # include vignetting by shifting ray outside image
-    xy[error<>0]=np.nan;                   # rays that could not be traced
+    xy   += image_size*(vigcode!=0);       # include vignetting by shifting ray outside image
+    xy[error!=0]=np.nan;                   # rays that could not be traced
     return xy;                             
 
   # set up image detector
@@ -41,21 +41,21 @@ def analyze_transmission(hDDE):
  
   # field sampling
   xx,yy=sampling.cartesian_sampling(3,3,rmax=.1);  # single point
-  for i in xrange(len(xx)):
+  for i in range(len(xx)):
     x=xx[i]; y=yy[i];
     print("Field point: x=%5.3f, y=%5.3f"%(x,y))
     
     # pupil sampling (circular, adaptive mesh)
     px,py=sampling.fibonacci_sampling_with_circular_boundary(300);
     pupil_sampling = np.vstack((px,py)).T;                 # size (nPoints,2)  
-    mapping = lambda(mesh_points): raytrace((x,y),mesh_points);
+    mapping = lambda mesh_points: raytrace((x,y),mesh_points);
     Mesh=AdaptiveMesh(pupil_sampling, mapping);
 
     # iterative refinement of skinny triangles
     rthresh = [1.7,1.5,1.7,2,3,3,4,4];
     Athresh = 0.00001;
     ref_steps =5;
-    is_skinny= lambda(simplices): Mesh.find_skinny_triangles(simplices=simplices,rthresh=rthresh[0]);
+    is_skinny= lambda simplices: Mesh.find_skinny_triangles(simplices=simplices,rthresh=rthresh[0]);
     Mesh.plot_triangulation(skip_triangle=is_skinny);
     for it in range(ref_steps): 
       Mesh.refine_skinny_triangles(rthresh=rthresh[it],Athresh=Athresh,bPlot=True);
@@ -66,7 +66,7 @@ def analyze_transmission(hDDE):
 
     # segmentation of triangles along cutting line
     lthresh = 0.5*image_size[1];
-    is_broken = lambda(simplices): Mesh.find_broken_triangles(simplices=simplices,lthresh=lthresh);  
+    is_broken = lambda simplices: Mesh.find_broken_triangles(simplices=simplices,lthresh=lthresh);  
     Mesh.refine_broken_triangles(is_broken,nDivide=100,bPlot=False);
 
     # update detectors

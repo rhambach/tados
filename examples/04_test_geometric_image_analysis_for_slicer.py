@@ -92,7 +92,7 @@ with dde_link.DDElinkHandler() as hDDE:
     if rotz==0: tol.print_current_geometric_changes();
   
     # compensator: rotate slicer around surface normal
-    if rotz<>0: compensator_rotz(tol,rotz);
+    if rotz!=0: compensator_rotz(tol,rotz);
 
     # geometric image analysis
     img,params = GeometricImageAnalysis(hDDE);

@@ -6,10 +6,8 @@ from PyOptics.raytrace2d import raytrace
 
 # ToDo: add PointSource
 
-class Source(object):
+class Source(object, metaclass=abc.ABCMeta):
   " abstract base class for all sources, defines interface only "
-
-  __metaclass__ = abc.ABCMeta
   
   @abc.abstractmethod
   def info(self, verbosity=0):
@@ -77,7 +75,7 @@ class CollimatedBeam(Source):
     
 class PointSource(Source):
   
-  def __init__(self,(z,y),amin=0,amax=360, n=1.):
+  def __init__(self,pos,amin=0,amax=360, n=1.):
     """
     Parameters
     ----------
@@ -89,8 +87,8 @@ class PointSource(Source):
       n : float
         refractive index of the medium around the source
     """
-    self.z=z;
-    self.y=y;    
+    self.z=pos[0];
+    self.y=pos[1];    
     self.amin=amin;
     self.amax=amax;
     self.n=n;
@@ -126,7 +124,7 @@ class PointSource(Source):
 
 class SingleRay(Source):
    
-  def __init__(self,(z,y),angle,n=1.):
+  def __init__(self,pos,angle,n=1.):
     """
     Parameters
     ----------
@@ -142,7 +140,7 @@ class SingleRay(Source):
     self.angle = angle;
     vz= np.cos(np.deg2rad(self.angle));
     vy= np.sin(np.deg2rad(self.angle));
-    self.ray = raytrace.Rays(z=z,y=y,vz=vz,vy=vy);
+    self.ray = raytrace.Rays(z=pos[0],y=pos[1],vz=vz,vy=vy);
     
   def info(self,verbosit=0):
     descr = "SingleRay";

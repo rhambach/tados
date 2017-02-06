@@ -7,9 +7,7 @@ import matplotlib.pylab as plt
 from matplotlib.collections import LineCollection
 from matplotlib.lines import Line2D
 
-class View(object):
-  __metaclass__ = abc.ABCMeta
-  
+class View(object, metaclass=abc.ABCMeta):
   def __init__(self,tracer,ax=None):
     if not tracer.raypath: 
       raise RuntimeError("raypath is empty. First run a raytrace before plotting.");

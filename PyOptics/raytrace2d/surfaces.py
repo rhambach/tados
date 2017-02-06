@@ -14,10 +14,8 @@ import numpy as np
 from PyOptics.raytrace2d.raytrace import Rays
 from PyOptics.raytrace2d.common import init_list1d
 
-class Surface(object):
+class Surface(object, metaclass=abc.ABCMeta):
   " abstract base class for all surfaces, defines interface only "
-
-  __metaclass__ = abc.ABCMeta
   
   @abc.abstractmethod
   def info(self, verbosity=0):
@@ -218,7 +216,7 @@ class SegmentedSurface(Surface):
     alpha_last = np.full(rays.num,np.inf);
  
     # iterate over all segments
-    for i in xrange(self.num-1):
+    for i in range(self.num-1):
 
       Ay = self.y[i];   Az = self.z[i];
       By = self.y[i+1]; Bz = self.z[i+1];

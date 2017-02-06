@@ -69,7 +69,7 @@ if __name__ == '__main__':
     filename= os.path.realpath('../tests/zemax/asphere_optimization.ZMX');
     minimize_scalar_FOM(filename,method="BFGS");
     print("\n>>> See Zemax Window for optimized system")    
-    raw_input("Press Enter to continue...")
+    input("Press Enter to continue...")
     
     # Optimization of gracing incidence mirror (hard problem, as curvature and tilt-angle
     # are very much interdependent). A simple optimization of the scalar FOM does not work.
@@ -79,7 +79,7 @@ if __name__ == '__main__':
     bounds = np.tile((-np.inf,np.inf),(4,1));  bounds[1]=(0,360);
     minimize_scalar_FOM(filename,method='Nelder-Mead',bounds=bounds);
     print("\n>>> See Zemax Window for optimized system")    
-    raw_input("Press Enter to continue...")
+    input("Press Enter to continue...")
     
     # more advanced optimization using least-squares fit of individual rows of the MFE
     minimize_vector_FOM(filename,method='dogbox',bounds=bounds.T,jac='3-point');
