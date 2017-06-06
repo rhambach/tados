@@ -65,6 +65,7 @@ def herzberger(wavelength, param):
     index = param[0] + param[1] * L + param[2] * L**2
     for i in xrange(3, len(param)):
         index += param[i] * wavelength**(2*(i-2))
+    return index
 
 
 def schott(wavelength, param):
@@ -146,9 +147,9 @@ def abbe(glass, wave1=0.4861327, wave2=0.5875618, wave3=0.6562725):
         float
             Abbe number.
     """
-    n1 = glass['formula'](wave1, glass['dispersion_data'])
-    n2 = glass['formula'](wave2, glass['dispersion_data'])
-    n3 = glass['formula'](wave3, glass['dispersion_data'])
+    n1 = index(glass, wave1)
+    n2 = index(glass, wave2)
+    n3 = index(glass, wave3)
     return (n2 - 1) / (n1 - n3)
 
 
@@ -337,8 +338,8 @@ def abbe_plot(catalog, wave1=0.4861327, wave2=0.5875618, wave3=0.6562725):
         annotation.set_visible(False)
         points_with_annotation.append([point, annotation])
     
-    ax.set_xlim(ax.get_xlim()[1], ax.get_xlim()[0])  # extend of abbe number(Vd)
-    ax.set_ylim(1.4, 2.1) # extend of index(Nd)
+    ax.set_xlim(ax.get_xlim()[1], ax.get_xlim()[0])  # extent of abbe number(Vd)
+    #ax.set_ylim(1.4, 2.1) # extent of index(Nd)
     ax.set_title('Modified Abbe diagram', fontsize=20)
     s1 = "n({}) - 1".format(wave2)
     s2 = "n({}) - n({})".format(wave1, wave3)
