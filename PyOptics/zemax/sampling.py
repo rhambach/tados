@@ -134,14 +134,17 @@ def fibonacci_sampling_with_circular_boundary(N,Nboundary=None,rmax=1.):
   
 
 def __test_sampling((x,y),title=""):
-  plt.figure();
-  plt.scatter(x,y);
-  plt.title(title);
+  fig,ax=plt.subplots(1,1);
+  t = np.linspace(0,2*np.pi,100,endpoint=True);  
+  ax.plot(np.sin(t),np.cos(t),'r',lw=2)
+  ax.scatter(x,y);  
+  ax.set_title(title);
+  ax.set_aspect('equal');
   
 
 if __name__ == '__main__':
   __test_sampling( cartesian_sampling(21,21), 'Cartesian');
-  __test_sampling( hexapolar_sampling(21),    'Hexapolar');
+  __test_sampling( hexapolar_sampling(11),    'Hexapolar');
   __test_sampling( fibonacci_sampling(500),   'Fibonacci');
   __test_sampling( fibonacci_sampling_with_circular_boundary(500), 'Fibonacci+boundary');
  

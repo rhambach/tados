@@ -361,10 +361,16 @@ class LineImageDetector(Detector):
     " plot projected intensity in image plane, returns figure handle"
     if fig is None: fig,ax1 = plt.subplots(1);
     else:           ax1=fig.axes[0];
-    # footprint
+    # calculate x-values
+    direction = self.end-self.start;
+    x=self.__x_rc*np.linalg.norm(direction); dx=x[1]-x[0];
+    if direction[0]==0: x+=self.start[1];    # line detector vertically, add y-start
+    if direction[1]==0: x+=self.start[0];    # line detector horizontally, add x-start
+  
+    # plotting    
     ax1.set_title("LineImageDetector: projected intensity in image plane");
-    x=self.__x_rc*np.linalg.norm(self.end-self.start); dx=x[1]-x[0];
     ax1.plot(x,self.intensity,**kwargs);
+    
     # azimuthal average
     logging.debug('LineImageDetector: total power = %5.3f W'%(np.sum(self.intensity)*dx)); 
     return fig

@@ -10,6 +10,7 @@ import matplotlib.pylab as plt
 import logging
 import os
 
+import _set_pkgdir
 from PyOptics.illumination.transmission import RectImageDetector
 from PyOptics.tolerancing.tolerancing import *
 from PyOptics.zemax import dde_link
