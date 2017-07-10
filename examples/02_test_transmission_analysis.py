@@ -10,7 +10,7 @@ import matplotlib.pylab as plt
 import logging
 
 from PyOptics.illumination.point_in_triangle import point_in_triangle
-from PyOptics.illumination.transmission import *
+from PyOptics.illumination import transmission
 from PyOptics.zemax import dde_link, sampling
 
 
@@ -50,11 +50,11 @@ def __test_intensity_footprint(hDDE):
   
   # set up image detector
   image_size=(0.2,0.05);  # [mm]
-  img = RectImageDetector(extent=image_size,pixels=(201,401));
-  dbg = CheckTriangulationDetector();
+  img = transmission.RectImageDetector(extent=image_size,pixels=(201,401));
+  dbg = transmission.CheckTriangulationDetector();
   
   # run Transmission calculation
-  T = Transmission(field_sampling,pupil_sampling,raytrace,[dbg,img]);
+  T = transmission.Transmission(field_sampling,pupil_sampling,raytrace,[dbg,img]);
   lthresh = 0.5*image_size[1];  
   T.total_transmission(lthresh)
   
@@ -98,11 +98,11 @@ def __test_angular_distribution(hDDE):
   
   # set up image detector (in angular space)
   NAmax = 0.3;
-  img = PolarImageDetector(rmax=NAmax,nrings=100);
-  dbg = CheckTriangulationDetector(ref_area=8*np.tan(np.pi/8)); # area of octagon with inner radius 1
+  img = transmission.PolarImageDetector(rmax=NAmax,nrings=100);
+  dbg = transmission.CheckTriangulationDetector(ref_area=8*np.tan(np.pi/8)); # area of octagon with inner radius 1
   
   # run Transmission calculation
-  T = Transmission(pupil_sampling,field_sampling,raytrace,[dbg,img]);
+  T = transmission.Transmission(pupil_sampling,field_sampling,raytrace,[dbg,img]);
   lthresh = 0.5*NAmax;  
   T.total_transmission(lthresh)
   

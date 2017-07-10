@@ -105,7 +105,7 @@ class DDElinkHandler(object):
     print("set pupil values: %ds"%(time.time()-t))
 
     # Trace the rays
-    ret = at.zArrayTrace(rays, timeout=100000)
+    ret = at.zArrayTrace(rays, timeout=100000);
     print(("zArrayTrace: %ds"%(time.time()-t)))
 
     # collect results
@@ -143,7 +143,7 @@ class DDElinkHandler(object):
     assert ret == 0, 'zGetTextFile() returned error code {}'.format(ret) 
     lines = pyz._readLinesFromFile(pyz._openFile(textFileName))
     assert lines[0]=='Image analysis histogram listing', "Output of Image analysis not found";
-    
+
     # scan header
     last_line_header = pyz._getFirstLineOfInterest(lines,'Units');
     params = [];  

@@ -14,16 +14,17 @@ ToDo: add unit tests
 """
 
 from __future__ import division
-import abc
+import abc, six
 import logging
 import numpy as np
 import matplotlib.pylab as plt
 
 from PyOptics.illumination.point_in_triangle import point_in_triangle
-from PyOptics.illumination.adaptive_mesh import *
-from PyOptics.zemax.sampling import *
+from PyOptics.illumination.adaptive_mesh import AdaptiveMesh
+from PyOptics.zemax.sampling import hexapolar_sampling
 
-class Detector(object, metaclass=abc.ABCMeta):
+@six.add_metaclass(abc.ABCMeta)
+class Detector(object):
   @abc.abstractmethod
   def add(self,mesh,bSkip=[],weight=1): return;
   @abc.abstractmethod  

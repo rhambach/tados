@@ -12,7 +12,7 @@ import os
 
 import _set_pkgdir
 from PyOptics.illumination.transmission import RectImageDetector
-from PyOptics.tolerancing.tolerancing import *
+from PyOptics.tolerancing import tolerancing
 from PyOptics.zemax import dde_link
 
 
@@ -54,7 +54,7 @@ def intensity_in_box(x,F,min_width=None,max_width=None):
   if max_width is None: max_width=dx*(x.size-0.5); # nBox<x.size
   assert min_width>dx, 'min_widht too small';
   assert max_width<dx*(x.size-1), 'max_width too large';
-  nBox = np.arange(np.floor(min_width/dx),np.ceil(max_width/dx));
+  nBox = np.arange(np.floor(min_width/dx),np.ceil(max_width/dx),dtype=int);
   w= dx*(nBox+1);           # width of the box with nBox pixels
   I=np.asarray([np.max(F[n:]-F[:-n]) for n in nBox]);
   return (w,I)
@@ -78,7 +78,7 @@ with dde_link.DDElinkHandler() as hDDE:
   #filename = os.path.join(ln.zGetPath()[1], 'Sequential', 'Objectives', 
   #                        'Cooke 40 degree field.zmx')
   filename= os.path.realpath('../tests/zemax/pupil_slicer.ZMX');
-  tol=ToleranceSystem(hDDE,filename)
+  tol=tolerancing.ToleranceSystem(hDDE,filename)
 
   # allow for compensators, here rotation about surface normal of slicer
   fig1,(ax1,ax2) = plt.subplots(nrows=1,ncols=2,sharey=True);   

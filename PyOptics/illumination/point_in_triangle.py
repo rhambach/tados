@@ -51,7 +51,7 @@ def PIT_barycentric(p, triangle):
   implementation follows http://www.blackpawn.com/texts/pointinpoly/
   """  
   a,b,c = triangle;       # shape: (2,)
-  ndim = np.ones(p.ndim); ndim[0]=-1;
+  ndim = np.ones(p.ndim,dtype=int); ndim[0]=-1;
   # vectors  
   v0 = c-a;               # shape: (2,)
   v1 = b-a;               # "

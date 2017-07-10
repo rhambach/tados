@@ -10,8 +10,8 @@ import numpy as np
 import matplotlib.pylab as plt
 import logging
 
-from PyOptics.illumination.transmission import *
-from PyOptics.tolerancing.tolerancing import *
+from PyOptics.illumination import transmission
+from PyOptics.tolerancing import tolerancing
 from PyOptics.zemax import dde_link, sampling
 
 def __test_tolerancing(tol):  
@@ -51,8 +51,8 @@ def __test_tolerancing(tol):
   
   # set up image detector
   image_size=(0.2,0.05);  # [mm]
-  img = RectImageDetector(extent=image_size,pixels=(201,401));
-  dbg = CheckTriangulationDetector();
+  img = transmission.RectImageDetector(extent=image_size,pixels=(201,401));
+  dbg = transmission.CheckTriangulationDetector();
 
   # disturb system (tolerancing)
   tol.change_thickness(4,11,value=2); # shift of pupil slicer
@@ -62,7 +62,7 @@ def __test_tolerancing(tol):
   tol.ln.zPushLens(1);  
   
   # run Transmission calculation
-  T = Transmission(field_sampling,pupil_sampling,raytrace,[dbg,img]);
+  T = transmission.Transmission(field_sampling,pupil_sampling,raytrace,[dbg,img]);
   lthresh = 0.5*image_size[1];  
   T.total_transmission(lthresh)
   
@@ -86,6 +86,6 @@ if __name__ == '__main__':
     #filename = os.path.join(ln.zGetPath()[1], 'Sequential', 'Objectives', 
     #                        'Cooke 40 degree field.zmx')
     filename= os.path.realpath('../tests/zemax/pupil_slicer.ZMX');
-    tol=ToleranceSystem(hDDE,filename)
+    tol=tolerancing.ToleranceSystem(hDDE,filename)
     __test_tolerancing(tol);
     

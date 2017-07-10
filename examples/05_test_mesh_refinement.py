@@ -8,12 +8,10 @@ Created on Mon Apr 04 10:37:13 2016
 from __future__ import division
 import logging
 import numpy as np
-import matplotlib.pylab as plt
 
 import _set_pkgdir
-from PyOptics.illumination.point_in_triangle import point_in_triangle
-from PyOptics.illumination.adaptive_mesh import *
-from PyOptics.illumination.transmission import *
+import PyOptics.illumination.adaptive_mesh as mesh
+from PyOptics.illumination import transmission
 from PyOptics.zemax import sampling, dde_link
 
 
@@ -35,8 +33,8 @@ def analyze_transmission(hDDE):
 
   # set up image detector
   image_size = np.asarray((1.1,0.3));
-  img = RectImageDetector(extent=image_size,pixels=(600,200));
-  dbg = CheckTriangulationDetector();
+  img = transmission.RectImageDetector(extent=image_size,pixels=(600,200));
+  dbg = transmission.CheckTriangulationDetector();
   detectors=[img,]#dbg]
  
   # field sampling
@@ -49,7 +47,7 @@ def analyze_transmission(hDDE):
     px,py=sampling.fibonacci_sampling_with_circular_boundary(300);
     pupil_sampling = np.vstack((px,py)).T;                 # size (nPoints,2)  
     mapping = lambda mesh_points: raytrace((x,y),mesh_points);
-    Mesh=AdaptiveMesh(pupil_sampling, mapping);
+    Mesh=mesh.AdaptiveMesh(pupil_sampling, mapping);
 
     # iterative refinement of skinny triangles
     rthresh = [1.7,1.5,1.7,2,3,3,4,4];

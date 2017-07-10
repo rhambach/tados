@@ -5,11 +5,9 @@ http://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.optimize.minimi
 
 @author: Hambach
 """
-
 import logging
 import numpy as np
 from scipy.optimize import minimize,least_squares
-import matplotlib.pylab as plt
 
 import _set_pkgdir
 import PyOptics.optimization as opt
@@ -62,6 +60,8 @@ def minimize_vector_FOM(filename,**kwargs):
 if __name__ == '__main__':
   import os as os
   logging.basicConfig(level=logging.INFO);   # use logging.DEBUG for more info
+  # python2 compatibility, see https://stackoverflow.com/questions/21731043/use-of-input-raw-input-in-python-2-and-3
+  if hasattr(__builtins__, 'raw_input'): input = raw_input 
   
   with dde_link.DDElinkHandler() as hDDE:
 

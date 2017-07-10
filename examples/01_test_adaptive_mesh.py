@@ -12,7 +12,7 @@ import matplotlib.pylab as plt
 
 import _set_pkgdir
 from PyOptics.illumination.point_in_triangle import point_in_triangle
-from PyOptics.illumination.adaptive_mesh import *
+from PyOptics.illumination.adaptive_mesh import AdaptiveMesh
 from PyOptics.zemax import sampling, dde_link
 
 def analyze_transmission(hDDE):  
