@@ -9,9 +9,9 @@ import logging
 import numpy as np
 from scipy.optimize import minimize,least_squares
 
-from _context import PyOptics
-import PyOptics.optimization as opt
-from PyOptics.zemax import dde_link
+from _context import tados
+import tados.optimization as opt
+from tados.zemax import dde_link
 
 
 def minimize_scalar_FOM(filename,**kwargs):

@@ -4,8 +4,8 @@ import numpy as np
 import matplotlib.pylab as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 
-from _context import PyOptics
-import PyOptics.raytrace2d as rt
+from _context import tados
+import tados.raytrace2d as rt
 
 def plot_polygon(Nverts,Nreflections,Nrays,intensity):
 

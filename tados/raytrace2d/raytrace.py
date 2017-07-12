@@ -3,7 +3,7 @@
 import numpy as np
 import matplotlib.pylab as plt
 
-from PyOptics.raytrace2d.common import init_list1d
+from tados.raytrace2d.common import init_list1d
 
 class Rays(object):
   

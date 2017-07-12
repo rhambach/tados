@@ -9,10 +9,10 @@ import numpy as np
 import matplotlib.pylab as plt
 import logging
 
-from _context import PyOptics
-from PyOptics.illumination.point_in_triangle import point_in_triangle
-from PyOptics.illumination import transmission
-from PyOptics.zemax import dde_link, sampling
+from _context import tados
+from tados.illumination.point_in_triangle import point_in_triangle
+from tados.illumination import transmission
+from tados.zemax import dde_link, sampling
 
 
 def __test_intensity_footprint(hDDE):  

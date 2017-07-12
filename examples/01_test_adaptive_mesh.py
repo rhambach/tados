@@ -10,10 +10,10 @@ import logging
 import numpy as np
 import matplotlib.pylab as plt
 
-from _context import PyOptics
-from PyOptics.illumination.point_in_triangle import point_in_triangle
-from PyOptics.illumination.adaptive_mesh import AdaptiveMesh
-from PyOptics.zemax import sampling, dde_link
+from _context import tados
+from tados.illumination.point_in_triangle import point_in_triangle
+from tados.illumination.adaptive_mesh import AdaptiveMesh
+from tados.zemax import sampling, dde_link
 
 def analyze_transmission(hDDE):  
   # set up ray-trace parameters and image detector

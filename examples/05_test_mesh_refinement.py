@@ -9,10 +9,10 @@ from __future__ import division
 import logging
 import numpy as np
 
-from _context import PyOptics
-import PyOptics.illumination.adaptive_mesh as mesh
-from PyOptics.illumination import transmission
-from PyOptics.zemax import sampling, dde_link
+from _context import tados
+import tados.illumination.adaptive_mesh as mesh
+from tados.illumination import transmission
+from tados.zemax import sampling, dde_link
 
 
 def analyze_transmission(hDDE):  

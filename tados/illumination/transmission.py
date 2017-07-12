@@ -19,9 +19,9 @@ import logging
 import numpy as np
 import matplotlib.pylab as plt
 
-from PyOptics.illumination.point_in_triangle import point_in_triangle
-from PyOptics.illumination.adaptive_mesh import AdaptiveMesh
-from PyOptics.zemax.sampling import hexapolar_sampling
+from tados.illumination.point_in_triangle import point_in_triangle
+from tados.illumination.adaptive_mesh import AdaptiveMesh
+from tados.zemax.sampling import hexapolar_sampling
 
 @six.add_metaclass(abc.ABCMeta)
 class Detector(object):

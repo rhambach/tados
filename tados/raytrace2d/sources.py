@@ -2,7 +2,7 @@
 
 import abc, six
 import numpy as np
-from PyOptics.raytrace2d import raytrace
+from tados.raytrace2d import raytrace
 
 # ToDo: add PointSource
 

@@ -8,8 +8,8 @@ Created on Thu Aug 18 16:03:53 2016
 import numpy as np
 import matplotlib.pylab as plt
 
-from _context import PyOptics
-import PyOptics.raytrace2d as rt
+from _context import tados
+import tados.raytrace2d as rt
 
 def get_reference_system(Nreflections):
   " build zigsag system from single Segments"

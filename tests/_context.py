@@ -5,7 +5,7 @@
   see https://stackoverflow.com/questions/714063/importing-modules-from-parent-folder/33532002#33532002
   
   Copyright (c) 2016, rhambach. 
-    This file is part of the PyOptics package and released
+    This file is part of the tados package and released
     under the MIT-Licence. See LICENCE file for details.
 """
 
@@ -19,4 +19,4 @@ moduledir = testdir[:testdir.rfind(os.path.sep)]
 if moduledir not in sys.path:
   sys.path.insert(1,moduledir)
 
-import PyOptics
+import tados

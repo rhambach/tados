@@ -10,10 +10,10 @@ import matplotlib.pylab as plt
 import logging
 import os
 
-from _context import PyOptics, moduledir
-from PyOptics.illumination.transmission import RectImageDetector
-from PyOptics.tolerancing import tolerancing
-from PyOptics.zemax import dde_link
+from _context import tados, moduledir
+from tados.illumination.transmission import RectImageDetector
+from tados.tolerancing import tolerancing
+from tados.zemax import dde_link
 
 
 def GeometricImageAnalysis(hDDE, testFileName=None):

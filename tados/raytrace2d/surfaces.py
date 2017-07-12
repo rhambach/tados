@@ -11,8 +11,8 @@ http://stackoverflow.com/questions/14697442/faster-way-of-polygon-intersection-w
 import abc, six
 import numpy as np
 
-from PyOptics.raytrace2d.raytrace import Rays
-from PyOptics.raytrace2d.common import init_list1d
+from tados.raytrace2d.raytrace import Rays
+from tados.raytrace2d.common import init_list1d
 
 @six.add_metaclass(abc.ABCMeta)    # backward compatible to 2.7
 class Surface(object):

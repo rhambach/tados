@@ -10,10 +10,10 @@ import numpy as np
 import matplotlib.pylab as plt
 import logging
 
-from _context import PyOptics
-from PyOptics.illumination import transmission
-from PyOptics.tolerancing import tolerancing
-from PyOptics.zemax import dde_link, sampling
+from _context import tados
+from tados.illumination import transmission
+from tados.tolerancing import tolerancing
+from tados.zemax import dde_link, sampling
 
 def __test_tolerancing(tol):  
   

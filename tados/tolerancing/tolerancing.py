@@ -214,7 +214,7 @@ class ToleranceSystem(object):
 
 if __name__ == '__main__':
   import os
-  from PyOptics.zemax import dde_link
+  from tados.zemax import dde_link
   
   with dde_link.DDElinkHandler() as hDDE:
     
