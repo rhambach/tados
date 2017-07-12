@@ -3,7 +3,7 @@
 import numpy as np
 import matplotlib.pylab as plt
 
-import _set_pkgdir
+from _context import PyOptics
 import PyOptics.raytrace2d as rt
 
 # source
