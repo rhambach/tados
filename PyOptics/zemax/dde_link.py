@@ -4,11 +4,12 @@ Created on Thu Apr 07 19:45:55 2016
 
 @author: Hambach
 """
-import pyzdde.arraytrace as at  # Module for array ray tracing
-import pyzdde.zdde as pyz
 import numpy as np
 import logging
 import os as _os
+
+import pyzdde.arraytrace as at  # Module for array ray tracing
+import pyzdde.zdde as pyz
 
 class DDElinkHandler(object):
   """

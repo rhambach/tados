@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pylab as plt
 import logging
 
+from _context import PyOptics
 from PyOptics.illumination.point_in_triangle import point_in_triangle
 from PyOptics.illumination import transmission
 from PyOptics.zemax import dde_link, sampling
@@ -111,8 +112,8 @@ def __test_angular_distribution(hDDE):
 
 
 if __name__ == '__main__':
-  import os as os
-  import sys as sys
+  import os 
+  from _context import moduledir
   logging.basicConfig(level=logging.INFO);
   
   with dde_link.DDElinkHandler() as hDDE:
@@ -121,7 +122,7 @@ if __name__ == '__main__':
     # load example file
     #filename = os.path.join(ln.zGetPath()[1], 'Sequential', 'Objectives', 
     #                        'Cooke 40 degree field.zmx')
-    filename= os.path.realpath('../tests/zemax/pupil_slicer.ZMX');
+    filename= os.path.join(moduledir,'tests','zemax','pupil_slicer.ZMX');
     hDDE.load(filename);
     __test_intensity_footprint(hDDE);
     __test_angular_distribution(hDDE);

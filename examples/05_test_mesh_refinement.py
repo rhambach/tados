@@ -9,7 +9,7 @@ from __future__ import division
 import logging
 import numpy as np
 
-import _set_pkgdir
+from _context import PyOptics
 import PyOptics.illumination.adaptive_mesh as mesh
 from PyOptics.illumination import transmission
 from PyOptics.zemax import sampling, dde_link
@@ -82,6 +82,7 @@ def analyze_transmission(hDDE):
 
 if __name__ == '__main__':
   import os as os
+  from _context import moduledir
   logging.basicConfig(level=logging.DEBUG);
    
   with dde_link.DDElinkHandler() as hDDE:
@@ -90,7 +91,7 @@ if __name__ == '__main__':
     # load example file
     #filename = os.path.join(ln.zGetPath()[1], 'Sequential', 'Objectives', 
     #                        'Cooke 40 degree field.zmx')
-    filename= os.path.realpath('../tests/zemax/fraunhofer_logo.ZMX');
+    filename= os.path.join(moduledir,'tests','zemax','fraunhofer_logo.ZMX');
     hDDE.load(filename);
     analyze_transmission(hDDE);
     

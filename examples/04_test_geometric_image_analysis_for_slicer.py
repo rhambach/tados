@@ -10,7 +10,7 @@ import matplotlib.pylab as plt
 import logging
 import os
 
-import _set_pkgdir
+from _context import PyOptics, moduledir
 from PyOptics.illumination.transmission import RectImageDetector
 from PyOptics.tolerancing import tolerancing
 from PyOptics.zemax import dde_link
@@ -77,7 +77,7 @@ with dde_link.DDElinkHandler() as hDDE:
   # load example file
   #filename = os.path.join(ln.zGetPath()[1], 'Sequential', 'Objectives', 
   #                        'Cooke 40 degree field.zmx')
-  filename= os.path.realpath('../tests/zemax/pupil_slicer.ZMX');
+  filename= os.path.join(moduledir,'tests','zemax','pupil_slicer.ZMX');
   tol=tolerancing.ToleranceSystem(hDDE,filename)
 
   # allow for compensators, here rotation about surface normal of slicer

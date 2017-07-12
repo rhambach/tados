@@ -10,7 +10,7 @@ import logging
 import numpy as np
 import matplotlib.pylab as plt
 
-import _set_pkgdir
+from _context import PyOptics
 from PyOptics.illumination.point_in_triangle import point_in_triangle
 from PyOptics.illumination.adaptive_mesh import AdaptiveMesh
 from PyOptics.zemax import sampling, dde_link
@@ -106,6 +106,7 @@ def analyze_transmission(hDDE):
 
 if __name__ == '__main__':
   import os as os
+  from _context import moduledir
   logging.basicConfig(level=logging.INFO);
   
   with dde_link.DDElinkHandler() as hDDE:
@@ -114,7 +115,7 @@ if __name__ == '__main__':
     # load example file
     #filename = os.path.join(ln.zGetPath()[1], 'Sequential', 'Objectives', 
     #                        'Cooke 40 degree field.zmx')
-    filename= os.path.realpath('../tests/zemax/pupil_slicer.ZMX');
+    filename= os.path.join(moduledir,'tests','zemax','pupil_slicer.ZMX');
     hDDE.load(filename);
     analyze_transmission(hDDE);
     

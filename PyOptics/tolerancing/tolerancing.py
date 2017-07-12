@@ -214,12 +214,12 @@ class ToleranceSystem(object):
 
 if __name__ == '__main__':
   import os
-  from zemax_dde_link import *
+  from PyOptics.zemax import dde_link
   
-  with DDElinkHandler() as hDDE:
+  with dde_link.DDElinkHandler() as hDDE:
     
     # start tolerancing
-    filename= os.path.realpath('./tests/pupil_slicer.ZMX');
+    filename= os.path.realpath('../../tests/zemax/pupil_slicer.ZMX');
     tol=ToleranceSystem(hDDE,filename);
     tol.print_LDE();
   
