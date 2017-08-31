@@ -16,7 +16,8 @@ from matplotlib.widgets import Cursor
 
 
 # Common wavelengths in microns
-wave = {'F': 0.4861327,
+wave = {'g': 0.4358343,
+        'F': 0.4861327,
         'd': 0.5875618,
         'C': 0.6562725}
 
@@ -151,6 +152,32 @@ def abbe(glass, wave1=0.4861327, wave2=0.5875618, wave3=0.6562725):
     n2 = index(glass, wave2)
     n3 = index(glass, wave3)
     return (n2 - 1) / (n1 - n3)
+    
+
+def partial_dispersion(glass, wave1=0.4358343, wave2=0.4861327, wave3=0.6562725):
+    """
+    Calculate the partial dispersion for a set of wavelengths.
+    
+    Parameters
+    ----------
+        glass : dict
+            Glass data as returned by ``read_agf_file()``.
+        wave1 : float
+            Lower boundary of the wavelength range in microns. Default: 0.4358343 (mercury g line)        
+        wave2 : float
+            Lower boundary of the wavelength range in microns. Default: 0.4861327 (hydrogen F line)
+        wave3 : float
+            Upper boundary of the wavelength range in microns. Default: 0.6562725 (ydrogen C line)
+
+    Returns
+    -------
+        float
+            Partial dispersion.
+    """
+    n1 = index(glass, wave1)
+    n2 = index(glass, wave2)
+    n3 = index(glass, wave3)
+    return (n1 - n2) / (n2 - n3)
 
 
 def read_agf_file(filename, encoding='ascii'):
@@ -297,7 +324,7 @@ def abbe_plot(catalog, wave1=0.4861327, wave2=0.5875618, wave3=0.6562725):
         wave2 : float
             Center of the wavelength range in microns. Default: 0.5875618 (helium d line)
         wave3 : float
-            Upper boundary of the wavelength range in microns. Default: 0.6562725 (ydrogen C line)
+            Upper boundary of the wavelength range in microns. Default: 0.6562725 (Hydrogen C line)
     
     Example
     -------
@@ -330,7 +357,7 @@ def abbe_plot(catalog, wave1=0.4861327, wave2=0.5875618, wave3=0.6562725):
         n = index(catalog[glass], wave2)
         v = abbe(catalog[glass], wave1, wave2, wave3)
         point, = plt.plot(v, n, 'o', markersize=10, markerfacecolor=fc[catalog[glass]['status']])
-        annotation = ax.annotate("%s nd = %5.3f vd = %4.1f" % (glass, catalog[glass]['nd'], catalog[glass]['vd']),
+        annotation = ax.annotate("%s n = %5.3f v = %4.1f" % (glass, n, v),
                                  xy=(v, n), xycoords='data',xytext=(v, n), textcoords='data', horizontalalignment="left",
                                  bbox=dict(boxstyle="round", facecolor="w", edgecolor="0.5", alpha=0.9))
      
@@ -368,6 +395,97 @@ def abbe_plot(catalog, wave1=0.4861327, wave2=0.5875618, wave3=0.6562725):
     plt.show()
     
 
+def partial_dispersion_plot(catalog, wave1=0.4358343, wave2=0.4861327, wave3=0.5875618, wave4=0.6562725):
+    """
+    Generate a partial dispersion vs. Abbe number plot from a Zemax AGF glass catalog file for an arbitrary set of wavelengths.
+    
+    Parameters
+    ----------
+        catalog : dict
+            Glass catalog to be displayed (as returned by read_agf_file()).
+        wave1 : float
+            Extended lower boundary of the wavelength range in microns. Default: Default: 0.4358343 (mercury g line)
+        wave2 : float
+            Lower boundary of the wavelength range for the Abbe number in microns. Default: 0.4861327 (hydrogen F line)
+        wave3 : float
+            Center of the wavelength range for the Abbe number in microns. Default: 0.5875618 (helium d line)
+        wave4 : float
+            Upper boundary of the wavelength range in microns. Default: 0.6562725 (Hydrogen C line)
+
+    Example
+    -------
+        >>> from os.path import expanduser
+        >>> # get user's home directory
+        >>> home = expanduser("~")
+        >>> glass_dir = home + r"\Documents\Zemax\Glasscat\"
+        >>> # Read glass catalog file
+        >>> catalog = read_agf_file(glass_dir + "schott.agf")
+        >>> # partial dispersion plot for some near-infrared wavelengths
+        >>> partial_dispersion_plot(catalog, 0.75, 0.8, 0.85, 0.9)
+    """
+    fig = plt.figure(figsize=(8, 6)) # facecolor='white'
+    ax = plt.axes()
+    # adds grid
+    plt.grid(True)
+    plt.locator_params(nbins=20) # grid size
+    
+    points_with_annotation = list() # data point with annotation
+
+    # Facecolor indicate the Status as same as Zemax indicated:Status is 0 for Standard,
+    # 1 for Preferred, 2 for Obsolete, 3 for Special, and 4 for Melt.
+    fc = {'Standard': 'black',
+          'Preferred': 'green',
+          'Obsolete': 'red',
+          'Special': 'blue',
+          'Melt': 'orange'}
+
+    for glass in catalog:
+        n = index(catalog[glass], wave3)
+        v = abbe(catalog[glass], wave2, wave3, wave4)
+        pgf = partial_dispersion(catalog[glass], wave1, wave2, wave4)
+        point, = plt.plot(v, pgf, 'o', markersize=10, markerfacecolor=fc[catalog[glass]['status']])
+        annotation = ax.annotate("%s n = %5.3f v = %4.1f Pgf = %4.1f" % (glass, n, v, pgf),
+                                 xy=(v, pgf), xycoords='data',xytext=(v, pgf), textcoords='data', horizontalalignment="left",
+                                 bbox=dict(boxstyle="round", facecolor="w", edgecolor="0.5", alpha=0.9))
+     
+        # by default, disable the annotation visibility
+        annotation.set_visible(False)
+        points_with_annotation.append([point, annotation])
+    
+    ax.set_xlim(ax.get_xlim()[1], ax.get_xlim()[0])  # extent of abbe number(Vd)
+    #ax.set_ylim(1.4, 2.1) # extent of index(Nd)
+    ax.set_title('Partial dispersion diagram', fontsize=20)
+    s1 = "n({}) - 1".format(wave3)
+    s2 = "n({}) - n({})".format(wave2, wave4)
+    ax.set_xlabel(r'Equivalent Abbe number $\nu = \frac{' + s1 + '}{' + s2 + '}$', fontsize=16)
+    s1 = "n({}) - n({})".format(wave1, wave2)
+    s2 = "n({}) - n({})".format(wave2, wave4)
+    print(s1, s2)
+    ax.set_ylabel(r'Partial dispersion $PD = \frac{' + s1 + '}{' + s2 + '}$', fontsize=16)
+
+    # Thanks to pelson (https://stackoverflow.com/users/741316/pelson) for providing the method at stackoverflow.com
+    # https://stackoverflow.com/questions/11537374/matplotlib-basemap-popup-box#new-answer
+    def on_move(event):
+        visibility_changed = False
+        for point, annotation in points_with_annotation:
+            should_be_visible = (point.contains(event)[0] == True)
+    
+            if should_be_visible != annotation.get_visible():
+                visibility_changed = True
+                annotation.set_visible(should_be_visible)
+    
+        if visibility_changed:
+            plt.draw()
+    
+    on_move_id = fig.canvas.mpl_connect('motion_notify_event', on_move)
+    # make an arbitrary legend for the glass status
+    dummy_lines = [matplotlib.lines.Line2D([0], [0], linestyle='none', marker='o', markerfacecolor=fc[item], label=item) for item in fc.keys()]
+    ax.legend(dummy_lines, fc.keys(), numpoints=1, loc='upper left', fontsize=14)
+    plt.tight_layout()
+    plt.show()
+    
+
+    
 if __name__ == "__main__":
     from os.path import expanduser
     
