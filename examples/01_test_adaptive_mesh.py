@@ -5,15 +5,15 @@ Created on Mon Apr 04 10:37:13 2016
 @author: Hambach
 """
 
-from __future__ import division
+
 import logging
 import numpy as np
 import matplotlib.pylab as plt
 
-import _set_pkgdir
-from PyOptics.illumination.point_in_triangle import point_in_triangle
-from PyOptics.illumination.adaptive_mesh import *
-from PyOptics.zemax import sampling, dde_link
+from _context import tados
+from tados.illumination.point_in_triangle import point_in_triangle
+from tados.illumination.adaptive_mesh import AdaptiveMesh
+from tados.zemax import sampling, dde_link
 
 def analyze_transmission(hDDE):  
   # set up ray-trace parameters and image detector
@@ -28,7 +28,7 @@ def analyze_transmission(hDDE):
 
   # field sampling
   xx,yy=sampling.cartesian_sampling(3,3,rmax=.1)  
-  for i in xrange(len(xx)):
+  for i in range(len(xx)):
     x=xx[i]; y=yy[i];
     print("Field point: x=%5.3f, y=%5.3f"%(x,y))
     
@@ -38,7 +38,7 @@ def analyze_transmission(hDDE):
     def raytrace(pupil_points):        # local function for raytrace
       px,py = pupil_points.T;
       ret = hDDE.trace_rays(x,y,px,py,wavenum,surf=image_surface);
-      vigcode = ret[:,[1]]<>0;        # include vignetting by shifting ray outside image
+      vigcode = ret[:,[1]]!=0;        # include vignetting by shifting ray outside image
       return ret[:,[2,3]]+image_size*vigcode;
     Mesh=AdaptiveMesh(initial_sampling, raytrace);
 
@@ -46,14 +46,14 @@ def analyze_transmission(hDDE):
     if False:  
       # iterative refinement of broken triangles
       lthresh = 0.5*image_size[1];
-      is_large= lambda(simplices): Mesh.find_broken_triangles(simplices=simplices,lthresh=lthresh);    
+      is_large= lambda simplices: Mesh.find_broken_triangles(simplices=simplices,lthresh=lthresh);    
       for it in range(4): 
         Mesh.refine_large_triangles(is_large);
         if i==0: Mesh.plot_triangulation(skip_triangle=is_large);
     else:
       # segmentation of triangles along cutting line
       lthresh = 0.5*image_size[1];
-      is_broken = lambda(simplices): Mesh.find_broken_triangles(simplices=simplices,lthresh=lthresh);  
+      is_broken = lambda simplices: Mesh.find_broken_triangles(simplices=simplices,lthresh=lthresh);  
       Mesh.refine_broken_triangles(is_broken,nDivide=7,bPlot=True);
       if i==0: Mesh.plot_triangulation(skip_triangle=is_broken);      
     pupil_points, image_points, simplices = Mesh.get_mesh();
@@ -106,6 +106,7 @@ def analyze_transmission(hDDE):
 
 if __name__ == '__main__':
   import os as os
+  from _context import moduledir
   logging.basicConfig(level=logging.INFO);
   
   with dde_link.DDElinkHandler() as hDDE:
@@ -114,7 +115,7 @@ if __name__ == '__main__':
     # load example file
     #filename = os.path.join(ln.zGetPath()[1], 'Sequential', 'Objectives', 
     #                        'Cooke 40 degree field.zmx')
-    filename= os.path.realpath('../tests/zemax/pupil_slicer.ZMX');
+    filename= os.path.join(moduledir,'tests','zemax','pupil_slicer.ZMX');
     hDDE.load(filename);
     analyze_transmission(hDDE);
     

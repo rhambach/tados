@@ -47,8 +47,8 @@ class External_Zemax_Optimizer(object):
         # TODO: include extra data editor
         surfaces = self.zlink.zGetNumSurf()
         variables = []
-        for surf in xrange(surfaces + 1):
-            for param in range(0,3)+range(4,18):     # exclude SDIA=column #3
+        for surf in range(surfaces + 1):
+            for param in list(range(0,3))+list(range(4,18)):     # exclude SDIA=column #3
                 if self.zlink.zGetSolve(surf, param)[0] == 1:
                     variables.append((surf, param))
         return variables
@@ -57,7 +57,7 @@ class External_Zemax_Optimizer(object):
         " return array of strings, describing the meaning of each varable"
         
         names = ['Curv','Thick','Glass','SemiDia','Conic'];
-        names.extend(['Par%d'%i for i in xrange(1,13)]);
+        names.extend(['Par%d'%i for i in range(1,13)]);
         names.extend(['Par0']);
         return ["S%d.%s"%(surf,names[param]) 
                   for (surf,param) in self.variables];
@@ -70,7 +70,7 @@ class External_Zemax_Optimizer(object):
         nRows=self.zlink.zDeleteMFO(1);
         # get weight of each operand
         weights = [];      
-        for row in xrange(1,nRows+1):
+        for row in range(1,nRows+1):
           # set weight of comment rows to 0
           typ=self.zlink.zGetOperand(row, 1);
           if typ=='BLNK': weights.append(0); 
@@ -80,7 +80,7 @@ class External_Zemax_Optimizer(object):
     def get_MFE_targets(self):
         " return target for each row in the merit function editor"
         targets=[];
-        for row in xrange(1,self.MFE_weights.size+1):
+        for row in range(1,self.MFE_weights.size+1):
           targets.append( self.zlink.zGetOperand(row,8) );
         return np.asarray(targets);
         
@@ -135,7 +135,7 @@ class External_Zemax_Optimizer(object):
         else:
             nParam,nStates = x.shape;
             val = np.zeros(nStates)
-            for i in xrange(nStates):
+            for i in range(nStates):
                 self.setSystemState(x[:, i])
                 val[i] = self.zlink.zOptimize(-1)
         logging.debug("FOM: %8.5f"%val + "".join([" %12.9f,"%f for f in x]));

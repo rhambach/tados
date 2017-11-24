@@ -9,10 +9,15 @@ import numpy as np
 import matplotlib.pylab as plt
 import logging
 import os
+
+try:
+    import cPickle as pickle  # Python 2
+except ImportError:
+    import pickle             # Python 3
+
 from tolerancing import *
 from transmission import RectImageDetector
 from zemax_dde_link import *
-import cPickle as pickle
 import gzip
 
 def GeometricImageAnalysis(hDDE, testFileName=None):
@@ -73,16 +78,16 @@ def compensator_rotz(tol,angle):
 def tilt_obj(tol,xscale=0,yscale=0):   
   # corresponds to cleave angle of fiber 1
   tilt=np.tan(np.deg2rad(10)); # tilt by 10 deg
-  if xscale<>0: tol.ln.zSetSurfaceParameter(0,1,tilt*xscale)   # set Param1: X TANGENT
-  if yscale<>0: tol.ln.zSetSurfaceParameter(0,2,tilt*yscale)   # set Param1: X TANGENT 
+  if xscale!=0: tol.ln.zSetSurfaceParameter(0,1,tilt*xscale)   # set Param1: X TANGENT
+  if yscale!=0: tol.ln.zSetSurfaceParameter(0,2,tilt*yscale)   # set Param1: X TANGENT 
   tol.ln.zGetUpdate(); 
   return tilt*xscale,tilt*yscale
   
 def tilt_img(tol,xscale=0,yscale=0): 
   # corresponds to cleave angle of fiber 2  
   tilt=np.tan(np.deg2rad(10)); # tilt by 10 deg
-  if xscale<>0: tol.ln.zSetSurfaceParameter(-1,1,tilt*xscale)   # set Param1: X TANGENT
-  if yscale<>0: tol.ln.zSetSurfaceParameter(-1,2,tilt*yscale)   # set Param1: X TANGENT 
+  if xscale!=0: tol.ln.zSetSurfaceParameter(-1,1,tilt*xscale)   # set Param1: X TANGENT
+  if yscale!=0: tol.ln.zSetSurfaceParameter(-1,2,tilt*yscale)   # set Param1: X TANGENT 
   tol.ln.zGetUpdate(); 
   return tilt*xscale,tilt*yscale
   
@@ -244,18 +249,18 @@ with DDElinkHandler() as hDDE, open(logfile,'w') as OUT:
   OUT.write('seed: %d\n'%seed)
   OUT.write('tolerances included in Monte-Carlo simulation: \n')
   for f in tolerances:
-    OUT.write(' - %s\n'%f.func_name );
+    OUT.write(' - %s\n'%f.__name__ );
   y_samples = np.arange(0.033,0.040,0.001);
   y_str = (' I_%dum[W]'*len(y_samples)) % tuple(1000*y_samples);
   OUT.write('\n  run     rotz    Itot[W] %s\n' % (y_str));
 
   # loop over monte-carlo trials
-  for it in xrange(1000):
+  for it in range(1000):
     pklfile = os.path.join(outpath,'run%04d.pkl'%(it));
     if os.path.exists(pklfile): continue;  # do not overwrite existing data
     #print pklfile;
     save=dict();
-    save['tolerances']=[f.func_name for f in tolerances];    
+    save['tolerances']=[f.__name__ for f in tolerances];    
     randn = np.random.normal(size=(len(tolerances),2)); 
     save['randn']=randn;
     for key in ('rotz','img','params','Itot'):  save[key]=[];
@@ -280,7 +285,7 @@ with DDElinkHandler() as hDDE, open(logfile,'w') as OUT:
       #if rotz==0: tol.print_current_geometric_changes();
     
       # compensator: rotate slicer around surface normal
-      if rotz<>0: compensator_rotz(tol,rotz);
+      if rotz!=0: compensator_rotz(tol,rotz);
   
       # geometric image analysis
       img,params = GeometricImageAnalysis(hDDE);
@@ -305,9 +310,9 @@ with DDElinkHandler() as hDDE, open(logfile,'w') as OUT:
       y_boxy,I_boxy = intensity_in_box(y,cumy,min_width=0.03,max_width=0.04);
       I_boxy_samples = np.interp(y_samples,y_boxy,I_boxy);
       # log results
-      print "\n run #%04d: rotz=%8.5f, Itot=%8.5fW"%(it,rotz,Itot),
-      for i in xrange(3): 
-        print ", I%d=%5.3fW"%(1000*y_samples[i],I_boxy_samples[i]),
+      print("\n run #%04d: rotz=%8.5f, Itot=%8.5fW"%(it,rotz,Itot), end=' ')
+      for i in range(3): 
+        print(", I%d=%5.3fW"%(1000*y_samples[i],I_boxy_samples[i]), end=' ')
       OUT.write('\n  %04d  %8.5f  %8.5f'%(it,rotz,Itot) +\
                 ('  %8.5f'*len(y_samples)) % tuple(I_boxy_samples));
     # end: for rotz       

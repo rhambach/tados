@@ -5,15 +5,13 @@ http://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.optimize.minimi
 
 @author: Hambach
 """
-
 import logging
 import numpy as np
 from scipy.optimize import minimize,least_squares
-import matplotlib.pylab as plt
 
-import _set_pkgdir
-import PyOptics.optimization as opt
-from PyOptics.zemax import dde_link
+from _context import tados
+import tados.optimization as opt
+from tados.zemax import dde_link
 
 
 def minimize_scalar_FOM(filename,**kwargs):
@@ -61,25 +59,28 @@ def minimize_vector_FOM(filename,**kwargs):
 
 if __name__ == '__main__':
   import os as os
+  from _context import moduledir
   logging.basicConfig(level=logging.INFO);   # use logging.DEBUG for more info
+  # python2 compatibility, see https://stackoverflow.com/questions/21731043/use-of-input-raw-input-in-python-2-and-3
+  if hasattr(__builtins__, 'raw_input'): input = raw_input 
   
   with dde_link.DDElinkHandler() as hDDE:
 
     # Optimization of an Asphere (simple)
-    filename= os.path.realpath('../tests/zemax/asphere_optimization.ZMX');
+    filename= os.path.join(moduledir,'tests','zemax','asphere_optimization.ZMX');
     minimize_scalar_FOM(filename,method="BFGS");
     print("\n>>> See Zemax Window for optimized system")    
-    raw_input("Press Enter to continue...")
+    input("Press Enter to continue...")
     
     # Optimization of gracing incidence mirror (hard problem, as curvature and tilt-angle
     # are very much interdependent). A simple optimization of the scalar FOM does not work.
     # (Nelder-Mead seams to work best, L-BFGS-B does nothing)
-    filename = os.path.realpath('../tests/zemax/gracing_incidence_mirror_optimization.ZMX');
+    filename= os.path.join(moduledir,'tests','zemax','gracing_incidence_mirror_optimization.ZMX');
     # restrict tilt angle to 0-360 degree    
     bounds = np.tile((-np.inf,np.inf),(4,1));  bounds[1]=(0,360);
     minimize_scalar_FOM(filename,method='Nelder-Mead',bounds=bounds);
     print("\n>>> See Zemax Window for optimized system")    
-    raw_input("Press Enter to continue...")
+    input("Press Enter to continue...")
     
     # more advanced optimization using least-squares fit of individual rows of the MFE
     minimize_vector_FOM(filename,method='dogbox',bounds=bounds.T,jac='3-point');

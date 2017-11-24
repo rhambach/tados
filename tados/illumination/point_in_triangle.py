@@ -51,7 +51,7 @@ def PIT_barycentric(p, triangle):
   implementation follows http://www.blackpawn.com/texts/pointinpoly/
   """  
   a,b,c = triangle;       # shape: (2,)
-  ndim = np.ones(p.ndim); ndim[0]=-1;
+  ndim = np.ones(p.ndim,dtype=int); ndim[0]=-1;
   # vectors  
   v0 = c-a;               # shape: (2,)
   v1 = b-a;               # "
@@ -110,7 +110,7 @@ if __name__ == '__main__':
   
   # test different implementations of point in triangle
   for PIT in (PIT_crossproduct, PIT_barycentric, point_in_triangle):
-    print 'testing function %s ...' % (PIT.func_name)    
+    print('testing function %s ...' % (PIT.__name__))    
     test_few_points(points,triangles,PIT);
     test_image(image,triangles,PIT);
   

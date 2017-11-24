@@ -3,9 +3,8 @@
 import numpy as np
 import matplotlib.pylab as plt
 
-import _set_pkgdir
-import PyOptics.raytrace2d as rt
-
+from _context import tados
+import tados.raytrace2d as rt
 
 # source
 source = rt.CollimatedBeam(20,-10,0,n=1);

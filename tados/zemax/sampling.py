@@ -56,7 +56,7 @@ def hexapolar_sampling(Nr,rmax=1.,ind=False):
   Ntet = 6*np.arange(1,Nr);                  # number of points on each ring
   # construct grid points in each ring  
   x=[0]; y=[0];                              # first ring
-  for i in xrange(Nr-1):
+  for i in range(Nr-1):
     tet = np.linspace(0,2*np.pi,Ntet[i],endpoint=False);
     x.extend(r[i]*np.cos(tet));
     y.extend(r[i]*np.sin(tet));
@@ -133,7 +133,8 @@ def fibonacci_sampling_with_circular_boundary(N,Nboundary=None,rmax=1.):
   return np.hstack((x, xp)), np.hstack((y, yp));
   
 
-def __test_sampling((x,y),title=""):
+def __test_sampling(pos,title=""):
+  (x,y) = pos;
   fig,ax=plt.subplots(1,1);
   t = np.linspace(0,2*np.pi,100,endpoint=True);  
   ax.plot(np.sin(t),np.cos(t),'r',lw=2)

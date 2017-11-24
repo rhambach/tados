@@ -1,15 +1,14 @@
 # -*- coding: utf-8 -*-
 
-import abc
+import abc, six
 import numpy as np
 import matplotlib.pylab as plt
 
 from matplotlib.collections import LineCollection
 from matplotlib.lines import Line2D
 
+@six.add_metaclass(abc.ABCMeta)    # backward compatible to 2.7
 class View(object):
-  __metaclass__ = abc.ABCMeta
-  
   def __init__(self,tracer,ax=None):
     if not tracer.raypath: 
       raise RuntimeError("raypath is empty. First run a raytrace before plotting.");

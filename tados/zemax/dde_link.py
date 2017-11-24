@@ -4,11 +4,12 @@ Created on Thu Apr 07 19:45:55 2016
 
 @author: Hambach
 """
-import pyzdde.arraytrace as at  # Module for array ray tracing
-import pyzdde.zdde as pyz
 import numpy as np
 import logging
 import os as _os
+
+import pyzdde.arraytrace as at  # Module for array ray tracing
+import pyzdde.zdde as pyz
 
 class DDElinkHandler(object):
   """
@@ -35,7 +36,7 @@ class DDElinkHandler(object):
 
     # load file to DDE server
     ret = ln.zLoadFile(zmxfile);
-    if ret<>0:
+    if ret!=0:
         raise IOError("Could not load Zemax file '%s'. Error code %d" % (zmxfile,ret));
     logging.info("Successfully loaded zemax file: %s"%ln.zGetFile())
     
@@ -95,7 +96,7 @@ class DDElinkHandler(object):
         
     # fill in ray data array (following Zemax notation!)
     rays = at.getRayDataArray(nRays, tType=0, mode=mode, endSurf=surf)
-    for k in xrange(nRays):
+    for k in range(nRays):
       rays[k+1].x = x[k]      
       rays[k+1].y = y[k]
       rays[k+1].z = px[k]
@@ -105,12 +106,12 @@ class DDElinkHandler(object):
     print("set pupil values: %ds"%(time.time()-t))
 
     # Trace the rays
-    ret = at.zArrayTrace(rays, timeout=100000)
-    print("zArrayTrace: %ds"%(time.time()-t))
+    ret = at.zArrayTrace(rays, timeout=100000);
+    print(("zArrayTrace: %ds"%(time.time()-t)))
 
     # collect results
     results = np.asarray( [(r.error,r.vigcode,r.x,r.y,r.z,r.l,r.m,r.n,r.Exr,r.Eyr,r.Ezr) for r in rays[1:]] );
-    print("retrive data: %ds"%(time.time()-t))    
+    print(("retrive data: %ds"%(time.time()-t)))    
     return results;
 
 
@@ -143,7 +144,7 @@ class DDElinkHandler(object):
     assert ret == 0, 'zGetTextFile() returned error code {}'.format(ret) 
     lines = pyz._readLinesFromFile(pyz._openFile(textFileName))
     assert lines[0]=='Image analysis histogram listing', "Output of Image analysis not found";
-    
+
     # scan header
     last_line_header = pyz._getFirstLineOfInterest(lines,'Units');
     params = [];  
@@ -167,7 +168,7 @@ class DDElinkHandler(object):
     data = np.loadtxt(lines[first_line_data:]);
     data = data[::-1].T;                           # reorder data as [x,y]
     totFlux_data = np.sum(data)*imgSize**2/Nx/Ny;
-    print totFlux
+    print(totFlux)
     assert (data.shape==(Nx,Ny));                  # correct number of pixels read from file
     assert (abs(1-totFlux_data/totFlux) < 0.001);  # check that total flux is correct within 0.1%
     #plt.figure()  

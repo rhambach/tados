@@ -8,16 +8,15 @@ http://stackoverflow.com/questions/14697442/faster-way-of-polygon-intersection-w
 
 @author: Hambach
 """
-import abc
+import abc, six
 import numpy as np
 
-from PyOptics.raytrace2d.raytrace import Rays
-from PyOptics.raytrace2d.common import init_list1d
+from tados.raytrace2d.raytrace import Rays
+from tados.raytrace2d.common import init_list1d
 
+@six.add_metaclass(abc.ABCMeta)    # backward compatible to 2.7
 class Surface(object):
   " abstract base class for all surfaces, defines interface only "
-
-  __metaclass__ = abc.ABCMeta
   
   @abc.abstractmethod
   def info(self, verbosity=0):
@@ -218,7 +217,7 @@ class SegmentedSurface(Surface):
     alpha_last = np.full(rays.num,np.inf);
  
     # iterate over all segments
-    for i in xrange(self.num-1):
+    for i in range(self.num-1):
 
       Ay = self.y[i];   Az = self.z[i];
       By = self.y[i+1]; Bz = self.z[i+1];

@@ -9,9 +9,10 @@ import numpy as np
 import matplotlib.pylab as plt
 import logging
 
-from PyOptics.illumination.point_in_triangle import point_in_triangle
-from PyOptics.illumination.transmission import *
-from PyOptics.zemax import dde_link, sampling
+from _context import tados
+from tados.illumination.point_in_triangle import point_in_triangle
+from tados.illumination import transmission
+from tados.zemax import dde_link, sampling
 
 
 def __test_intensity_footprint(hDDE):  
@@ -27,8 +28,8 @@ def __test_intensity_footprint(hDDE):
     vigcode= ret[:,[1]];     
     xy    = ret[:,[2,3]];    
     # return (x,y) coordinates in image space    
-    xy   += image_size*(vigcode<>0);       # include vignetting by shifting ray outside image
-    xy[error<>0]=np.nan;                   # rays that could not be traced
+    xy   += image_size*(vigcode!=0);       # include vignetting by shifting ray outside image
+    xy[error!=0]=np.nan;                   # rays that could not be traced
     return xy;                             
 
 
@@ -50,11 +51,11 @@ def __test_intensity_footprint(hDDE):
   
   # set up image detector
   image_size=(0.2,0.05);  # [mm]
-  img = RectImageDetector(extent=image_size,pixels=(201,401));
-  dbg = CheckTriangulationDetector();
+  img = transmission.RectImageDetector(extent=image_size,pixels=(201,401));
+  dbg = transmission.CheckTriangulationDetector();
   
   # run Transmission calculation
-  T = Transmission(field_sampling,pupil_sampling,raytrace,[dbg,img]);
+  T = transmission.Transmission(field_sampling,pupil_sampling,raytrace,[dbg,img]);
   lthresh = 0.5*image_size[1];  
   T.total_transmission(lthresh)
   
@@ -77,7 +78,7 @@ def __test_angular_distribution(hDDE):
     error = ret[:,0];
     vigcode=ret[:,[1]];     
     kxky  = ret[:,[5,6]];                  # return (kx,ky) direction cosine in image space    
-    kxky[error<>0]=np.nan;                 # rays that could not be traced
+    kxky[error!=0]=np.nan;                 # rays that could not be traced
     return kxky;                             
 
   # field sampling (octagonal fiber, adaptive mesh)
@@ -98,11 +99,11 @@ def __test_angular_distribution(hDDE):
   
   # set up image detector (in angular space)
   NAmax = 0.3;
-  img = PolarImageDetector(rmax=NAmax,nrings=100);
-  dbg = CheckTriangulationDetector(ref_area=8*np.tan(np.pi/8)); # area of octagon with inner radius 1
+  img = transmission.PolarImageDetector(rmax=NAmax,nrings=100);
+  dbg = transmission.CheckTriangulationDetector(ref_area=8*np.tan(np.pi/8)); # area of octagon with inner radius 1
   
   # run Transmission calculation
-  T = Transmission(pupil_sampling,field_sampling,raytrace,[dbg,img]);
+  T = transmission.Transmission(pupil_sampling,field_sampling,raytrace,[dbg,img]);
   lthresh = 0.5*NAmax;  
   T.total_transmission(lthresh)
   
@@ -111,8 +112,8 @@ def __test_angular_distribution(hDDE):
 
 
 if __name__ == '__main__':
-  import os as os
-  import sys as sys
+  import os 
+  from _context import moduledir
   logging.basicConfig(level=logging.INFO);
   
   with dde_link.DDElinkHandler() as hDDE:
@@ -121,7 +122,7 @@ if __name__ == '__main__':
     # load example file
     #filename = os.path.join(ln.zGetPath()[1], 'Sequential', 'Objectives', 
     #                        'Cooke 40 degree field.zmx')
-    filename= os.path.realpath('../tests/zemax/pupil_slicer.ZMX');
+    filename= os.path.join(moduledir,'tests','zemax','pupil_slicer.ZMX');
     hDDE.load(filename);
     __test_intensity_footprint(hDDE);
     __test_angular_distribution(hDDE);

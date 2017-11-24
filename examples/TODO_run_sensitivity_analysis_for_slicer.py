@@ -9,10 +9,15 @@ import numpy as np
 import matplotlib.pylab as plt
 import logging
 import os
+
+try:
+    import cPickle as pickle  # Python 2
+except ImportError:
+    import pickle             # Python 3
+
 from tolerancing import *
 from transmission import RectImageDetector
 from zemax_dde_link import *
-import cPickle as pickle
 import gzip
 
 def GeometricImageAnalysis(hDDE, testFileName=None):
@@ -72,16 +77,16 @@ def compensator_rotz(tol,angle):
 def tilt_obj(tol,xscale=0,yscale=0):   
   # corresponds to cleave angle of fiber 1
   tilt=np.tan(np.deg2rad(10)); # tilt by 10 deg
-  if xscale<>0: tol.ln.zSetSurfaceParameter(0,1,tilt*xscale)   # set Param1: X TANGENT
-  if yscale<>0: tol.ln.zSetSurfaceParameter(0,2,tilt*yscale)   # set Param1: X TANGENT 
+  if xscale!=0: tol.ln.zSetSurfaceParameter(0,1,tilt*xscale)   # set Param1: X TANGENT
+  if yscale!=0: tol.ln.zSetSurfaceParameter(0,2,tilt*yscale)   # set Param1: X TANGENT 
   tol.ln.zGetUpdate(); 
   return tilt*xscale,tilt*yscale
   
 def tilt_img(tol,xscale=0,yscale=0): 
   # corresponds to cleave angle of fiber 2  
   tilt=np.tan(np.deg2rad(10)); # tilt by 10 deg
-  if xscale<>0: tol.ln.zSetSurfaceParameter(-1,1,tilt*xscale)   # set Param1: X TANGENT
-  if yscale<>0: tol.ln.zSetSurfaceParameter(-1,2,tilt*yscale)   # set Param1: X TANGENT 
+  if xscale!=0: tol.ln.zSetSurfaceParameter(-1,1,tilt*xscale)   # set Param1: X TANGENT
+  if yscale!=0: tol.ln.zSetSurfaceParameter(-1,2,tilt*yscale)   # set Param1: X TANGENT 
   tol.ln.zGetUpdate(); 
   return tilt*xscale,tilt*yscale
   
@@ -254,10 +259,10 @@ with DDElinkHandler() as hDDE, open(logfile,'w') as OUT:
   
   # for each possible disturbation of the optical system
   for itol,disturb_func in enumerate(tolerances):
-    disturb_name = disturb_func.func_name;
+    disturb_name = disturb_func.__name__;
     pklfile = os.path.join(outpath,'run%04d_%s.pkz'%(itol,disturb_name));
     if os.path.exists(pklfile): continue;  # do not overwrite existing data
-    print pklfile;
+    print(pklfile);
     OUT.write('\n-- %10s -----------------------------------------------\n'%disturb_name);
     OUT.write('  pklfile: %s\n'%pklfile);    
     OUT.write('      dx        dy        |(dx,dy)|       rotz       Itot[W]\n');
@@ -288,7 +293,7 @@ with DDElinkHandler() as hDDE, open(logfile,'w') as OUT:
         if rotz==0: tol.print_current_geometric_changes();
       
         # compensator: rotate slicer around surface normal
-        if rotz<>0: compensator_rotz(tol,rotz);
+        if rotz!=0: compensator_rotz(tol,rotz);
   
         # geometric image analysis
         img,params = GeometricImageAnalysis(hDDE);
@@ -321,7 +326,7 @@ with DDElinkHandler() as hDDE, open(logfile,'w') as OUT:
         # ax2.plot(y_boxy*1000,I_boxy,label='rotz=%3.1f'%rotz);
       
         # log results
-        print "tolerance '%20s': dx=%8.5f, dy=%8.5f, Itot=%8.5f"%(disturb_name,xs,ys,Itot)
+        print("tolerance '%20s': dx=%8.5f, dy=%8.5f, Itot=%8.5f"%(disturb_name,xs,ys,Itot))
         OUT.write('  %8.5f  %8.5f  %8.5f  %8.5f  %8.5f\n'%(xs,ys,np.linalg.norm((xs,ys)),rotz,Itot));
       
       # end: for rotz      
