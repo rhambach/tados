@@ -311,7 +311,7 @@ def read_agf_file(filename, encoding='ascii'):
     return catalog
 
 
-def abbe_plot(catalog, wave1=0.4861327, wave2=0.5875618, wave3=0.6562725):
+def abbe_plot(catalog, wave1=0.4861327, wave2=0.5875618, wave3=0.6562725, plot_transmission_at=None, filter_status=None):
     """
     Generate an Abbe diagram from a Zemax AGF glass catalog file for an arbitrary set of wavelengths.
     
@@ -345,7 +345,7 @@ def abbe_plot(catalog, wave1=0.4861327, wave2=0.5875618, wave3=0.6562725):
     
     points_with_annotation = list() # data point with annotation
 
-    # Facecolor indicate the Status as same as Zemax indicated:Status is 0 for Standard,
+    # Facecolor to indicate the Status is same as Zemax indicated:Status is 0 for Standard,
     # 1 for Preferred, 2 for Obsolete, 3 for Special, and 4 for Melt.
     fc = {'Standard': 'black',
           'Preferred': 'green',
@@ -354,9 +354,21 @@ def abbe_plot(catalog, wave1=0.4861327, wave2=0.5875618, wave3=0.6562725):
           'Melt': 'orange'}
 
     for glass in catalog:
+        if filter_status:
+            if catalog[glass]["status"] not in filter_status:
+                continue
         n = index(catalog[glass], wave2)
         v = abbe(catalog[glass], wave1, wave2, wave3)
-        point, = plt.plot(v, n, 'o', markersize=10, markerfacecolor=fc[catalog[glass]['status']])
+        if plot_transmission_at:
+            # TODO: Interpolation
+            # TODO: Gurantee same transmission thickness
+            try:
+                transmission = catalog[glass]["transmission"][catalog[glass]["transmission_lambda"].index(plot_transmission_at)]
+            except ValueError:
+                transmission = 0.0
+        else:
+            transmission = 1.0
+        point, = plt.plot(v, n, 'o', markersize=10, markerfacecolor=fc[catalog[glass]['status']], alpha=transmission)
         annotation = ax.annotate("%s n = %5.3f v = %4.1f" % (glass, n, v),
                                  xy=(v, n), xycoords='data',xytext=(v, n), textcoords='data', horizontalalignment="left",
                                  bbox=dict(boxstyle="round", facecolor="w", edgecolor="0.5", alpha=0.9))
@@ -431,7 +443,7 @@ def partial_dispersion_plot(catalog, wave1=0.4358343, wave2=0.4861327, wave3=0.5
     
     points_with_annotation = list() # data point with annotation
 
-    # Facecolor indicate the Status as same as Zemax indicated:Status is 0 for Standard,
+    # Facecolor to indicate the Status is same as Zemax indicated:Status is 0 for Standard,
     # 1 for Preferred, 2 for Obsolete, 3 for Special, and 4 for Melt.
     fc = {'Standard': 'black',
           'Preferred': 'green',
@@ -485,6 +497,58 @@ def partial_dispersion_plot(catalog, wave1=0.4358343, wave2=0.4861327, wave3=0.5
     plt.show()
     
 
+def plot_transmission_range(catalog, reference_waves=[]):
+    glassnames = cat.keys()
+    glassnames.sort()
+    glassnames = glassnames[223:-35]
+    min_wave = []
+    max_wave = []
+    for glassname in glassnames:
+        min_wave.append(cat[glassname]["min_lambda"])
+        max_wave.append(cat[glassname]["max_lambda"])
+    glassnames = np.array(glassnames)
+    min_wave = np.array(min_wave)
+    max_wave = np.array(max_wave)
+    
+    title = "Transmission Ranges"
+    index = np.arange(len(glassnames))
+    fig = plt.figure(figsize=(10, 0.4*(index[-1]+2)))
+    ax = plt.subplot(1, 1, 1)
+    ax.set_title(title, fontsize=14)
+    rects = ax.barh(index, max_wave, left=min_wave, align='center', alpha=0.4)
+    ax.set_xscale('linear')
+    ax.set_xlabel('Contribution to Total Scattered Energy [%]', fontsize=12)
+    ax.set_xlim((0.2, 1))
+    ax.set_yticklabels(glassnames, fontsize=12)
+    ax.set_yticks(index)
+    ax.set_ylim((index[0]-1, index[-1]+1))
+    plt.vlines(reference_waves, ax.get_ylim()[0], ax.get_ylim()[1], linestyles="dashed")
+    ax.grid()
+    plt.tight_layout()
+    plt.show()
+    
+
+def transmissive_glasses(catalog, min_wave, max_wave):
+    result = []
+    for glassname, data in catalog.items():
+        if data["min_lambda"] <= min_wave and data["max_lambda"] >= max_wave:
+            result.append(glassname)
+    result.sort()
+    return result
+    
+
+def filter_catalog(catalog, criterion, condition, value):
+    filtered_catalog = {}
+    if condition == "ge":
+        for glassname, data in catalog.items():
+            if data[criterion] >= value:
+                filtered_catalog[glassname] = data
+    elif condition == "le":
+         for glassname, data in catalog.items():
+            if data[criterion] <= value:
+                filtered_catalog[glassname] = data       
+    return filtered_catalog
+
     
 if __name__ == "__main__":
     from os.path import expanduser
@@ -498,5 +562,8 @@ if __name__ == "__main__":
     filename = home + r"\Documents\Zemax\Glasscat\schott.agf"
     
     cat = read_agf_file(filename, encoding='ascii')
-    abbe_plot(cat, wave1, wave2, wave3)
+    # abbe_plot(cat, wave1, wave2, wave3)
+    plot_transmission_range(cat, reference_waves=[0.35, 0.45, 0.656])
+    for glass in transmissive_glasses(cat, 0.35, 0.98):
+        print(glass)
     
