@@ -10,12 +10,14 @@ diagram for an arbitrary set of wavelengths.
 
 import codecs
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Cursor
 
 
 # Common wavelengths in microns
-wave = {'F': 0.4861327,
+wave = {'g': 0.4358343,
+        'F': 0.4861327,
         'd': 0.5875618,
         'C': 0.6562725}
 
@@ -64,6 +66,7 @@ def herzberger(wavelength, param):
     index = param[0] + param[1] * L + param[2] * L**2
     for i in range(3, len(param)):
         index += param[i] * wavelength**(2*(i-2))
+    return index
 
 
 def schott(wavelength, param):
@@ -145,10 +148,36 @@ def abbe(glass, wave1=0.4861327, wave2=0.5875618, wave3=0.6562725):
         float
             Abbe number.
     """
-    n1 = glass['formula'](wave1, glass['dispersion_data'])
-    n2 = glass['formula'](wave2, glass['dispersion_data'])
-    n3 = glass['formula'](wave3, glass['dispersion_data'])
+    n1 = index(glass, wave1)
+    n2 = index(glass, wave2)
+    n3 = index(glass, wave3)
     return (n2 - 1) / (n1 - n3)
+    
+
+def partial_dispersion(glass, wave1=0.4358343, wave2=0.4861327, wave3=0.6562725):
+    """
+    Calculate the partial dispersion for a set of wavelengths.
+    
+    Parameters
+    ----------
+        glass : dict
+            Glass data as returned by ``read_agf_file()``.
+        wave1 : float
+            Lower boundary of the wavelength range in microns. Default: 0.4358343 (mercury g line)        
+        wave2 : float
+            Lower boundary of the wavelength range in microns. Default: 0.4861327 (hydrogen F line)
+        wave3 : float
+            Upper boundary of the wavelength range in microns. Default: 0.6562725 (ydrogen C line)
+
+    Returns
+    -------
+        float
+            Partial dispersion.
+    """
+    n1 = index(glass, wave1)
+    n2 = index(glass, wave2)
+    n3 = index(glass, wave3)
+    return (n1 - n2) / (n2 - n3)
 
 
 def read_agf_file(filename, encoding='ascii'):
@@ -174,8 +203,13 @@ def read_agf_file(filename, encoding='ascii'):
             
     Example
     -------
-        >>> cat = read_agf_file("schott.agf")
-        >>> cat
+        >>> from os.path import expanduser
+        >>> # get user's home directory
+        >>> home = expanduser("~")
+        >>> glass_dir = home + r"\Documents\Zemax\Glasscat\"
+        >>> # Read glass catalog file
+        >>> catalog = read_agf_file(glass_dir + "schott.agf")
+        >>> catalog
         {'F2': {  'ar': 2.3,
                   'cr': 1.0,
                   'density': 3.599,
@@ -277,7 +311,7 @@ def read_agf_file(filename, encoding='ascii'):
     return catalog
 
 
-def abbe_plot(catalog, wave1=0.4861327, wave2=0.5875618, wave3=0.6562725):
+def abbe_plot(catalog, wave1=0.4861327, wave2=0.5875618, wave3=0.6562725, plot_transmission_at=None, filter_status=None):
     """
     Generate an Abbe diagram from a Zemax AGF glass catalog file for an arbitrary set of wavelengths.
     
@@ -290,13 +324,17 @@ def abbe_plot(catalog, wave1=0.4861327, wave2=0.5875618, wave3=0.6562725):
         wave2 : float
             Center of the wavelength range in microns. Default: 0.5875618 (helium d line)
         wave3 : float
-            Upper boundary of the wavelength range in microns. Default: 0.6562725 (ydrogen C line)
+            Upper boundary of the wavelength range in microns. Default: 0.6562725 (Hydrogen C line)
     
     Example
     -------
+        >>> from os.path import expanduser
+        >>> # get user's home directory
+        >>> home = expanduser("~")
+        >>> glass_dir = home + r"\Documents\Zemax\Glasscat\"
         >>> # Read glass catalog file
-        >>> catalog = read_agf_file("schott.agf")
-        >>> # "Abbe" diagram for near-infrared
+        >>> catalog = read_agf_file(glass_dir + "schott.agf")
+        >>> # "Abbe" diagram for some near-infrared wavelengths
         >>> abbe_plot(catalog, 0.8, 0.85, 0.9)
     """
     fig = plt.figure(figsize=(8, 6)) # facecolor='white'
@@ -307,29 +345,41 @@ def abbe_plot(catalog, wave1=0.4861327, wave2=0.5875618, wave3=0.6562725):
     
     points_with_annotation = list() # data point with annotation
 
-    # Facecolor indicate the Status as same as Zemax indicated:Status is 0 for Standard,
+    # Facecolor to indicate the Status is same as Zemax indicated:Status is 0 for Standard,
     # 1 for Preferred, 2 for Obsolete, 3 for Special, and 4 for Melt.
     fc = {'Standard': 'black',
           'Preferred': 'green',
           'Obsolete': 'red',
           'Special': 'blue',
-          'Melt': 'yellow'}
+          'Melt': 'orange'}
 
     for glass in catalog:
+        if filter_status:
+            if catalog[glass]["status"] not in filter_status:
+                continue
         n = index(catalog[glass], wave2)
         v = abbe(catalog[glass], wave1, wave2, wave3)
-        point, = plt.plot(v, n, 'o', markersize=10, markerfacecolor=fc[catalog[glass]['status']])
-        annotation = ax.annotate("%s $nd$=%f $vd$=%f" % (glass, n, v),
+        if plot_transmission_at:
+            # TODO: Interpolation
+            # TODO: Gurantee same transmission thickness
+            try:
+                transmission = catalog[glass]["transmission"][catalog[glass]["transmission_lambda"].index(plot_transmission_at)]
+            except ValueError:
+                transmission = 0.0
+        else:
+            transmission = 1.0
+        point, = plt.plot(v, n, 'o', markersize=10, markerfacecolor=fc[catalog[glass]['status']], alpha=transmission)
+        annotation = ax.annotate("%s n = %5.3f v = %4.1f" % (glass, n, v),
                                  xy=(v, n), xycoords='data',xytext=(v, n), textcoords='data', horizontalalignment="left",
                                  bbox=dict(boxstyle="round", facecolor="w", edgecolor="0.5", alpha=0.9))
-                                 
+     
         # by default, disable the annotation visibility
         annotation.set_visible(False)
         points_with_annotation.append([point, annotation])
     
-    ax.set_xlim(ax.get_xlim()[1], ax.get_xlim()[0])  # extend of abbe number(Vd)
-    ax.set_ylim(1.4, 2.1) # extend of index(Nd)
-    ax.set_title('Modified Abbe diagram')
+    ax.set_xlim(ax.get_xlim()[1], ax.get_xlim()[0])  # extent of abbe number(Vd)
+    #ax.set_ylim(1.4, 2.1) # extent of index(Nd)
+    ax.set_title('Modified Abbe diagram', fontsize=20)
     s1 = "n({}) - 1".format(wave2)
     s2 = "n({}) - n({})".format(wave1, wave3)
     ax.set_xlabel(r'Equivalent Abbe number $\nu = \frac{' + s1 + '}{' + s2 + '}$', fontsize=16)
@@ -350,22 +400,170 @@ def abbe_plot(catalog, wave1=0.4861327, wave2=0.5875618, wave3=0.6562725):
             plt.draw()
     
     on_move_id = fig.canvas.mpl_connect('motion_notify_event', on_move)
+    # make an arbitrary legend for the glass status
+    dummy_lines = [matplotlib.lines.Line2D([0], [0], linestyle='none', marker='o', markerfacecolor=fc[item], label=item) for item in fc.keys()]
+    ax.legend(dummy_lines, fc.keys(), numpoints=1, loc='upper left', fontsize=14)
     plt.tight_layout()
     plt.show()
     
 
+def partial_dispersion_plot(catalog, wave1=0.4358343, wave2=0.4861327, wave3=0.5875618, wave4=0.6562725):
+    """
+    Generate a partial dispersion vs. Abbe number plot from a Zemax AGF glass catalog file for an arbitrary set of wavelengths.
+    
+    Parameters
+    ----------
+        catalog : dict
+            Glass catalog to be displayed (as returned by read_agf_file()).
+        wave1 : float
+            Extended lower boundary of the wavelength range in microns. Default: Default: 0.4358343 (mercury g line)
+        wave2 : float
+            Lower boundary of the wavelength range for the Abbe number in microns. Default: 0.4861327 (hydrogen F line)
+        wave3 : float
+            Center of the wavelength range for the Abbe number in microns. Default: 0.5875618 (helium d line)
+        wave4 : float
+            Upper boundary of the wavelength range in microns. Default: 0.6562725 (Hydrogen C line)
+
+    Example
+    -------
+        >>> from os.path import expanduser
+        >>> # get user's home directory
+        >>> home = expanduser("~")
+        >>> glass_dir = home + r"\Documents\Zemax\Glasscat\"
+        >>> # Read glass catalog file
+        >>> catalog = read_agf_file(glass_dir + "schott.agf")
+        >>> # partial dispersion plot for some near-infrared wavelengths
+        >>> partial_dispersion_plot(catalog, 0.75, 0.8, 0.85, 0.9)
+    """
+    fig = plt.figure(figsize=(8, 6)) # facecolor='white'
+    ax = plt.axes()
+    # adds grid
+    plt.grid(True)
+    plt.locator_params(nbins=20) # grid size
+    
+    points_with_annotation = list() # data point with annotation
+
+    # Facecolor to indicate the Status is same as Zemax indicated:Status is 0 for Standard,
+    # 1 for Preferred, 2 for Obsolete, 3 for Special, and 4 for Melt.
+    fc = {'Standard': 'black',
+          'Preferred': 'green',
+          'Obsolete': 'red',
+          'Special': 'blue',
+          'Melt': 'orange'}
+
+    for glass in catalog:
+        n = index(catalog[glass], wave3)
+        v = abbe(catalog[glass], wave2, wave3, wave4)
+        pgf = partial_dispersion(catalog[glass], wave1, wave2, wave4)
+        point, = plt.plot(v, pgf, 'o', markersize=10, markerfacecolor=fc[catalog[glass]['status']])
+        annotation = ax.annotate("%s n = %5.3f v = %4.1f Pgf = %4.1f" % (glass, n, v, pgf),
+                                 xy=(v, pgf), xycoords='data',xytext=(v, pgf), textcoords='data', horizontalalignment="left",
+                                 bbox=dict(boxstyle="round", facecolor="w", edgecolor="0.5", alpha=0.9))
+     
+        # by default, disable the annotation visibility
+        annotation.set_visible(False)
+        points_with_annotation.append([point, annotation])
+    
+    ax.set_xlim(ax.get_xlim()[1], ax.get_xlim()[0])  # extent of abbe number(Vd)
+    #ax.set_ylim(1.4, 2.1) # extent of index(Nd)
+    ax.set_title('Partial dispersion diagram', fontsize=20)
+    s1 = "n({}) - 1".format(wave3)
+    s2 = "n({}) - n({})".format(wave2, wave4)
+    ax.set_xlabel(r'Equivalent Abbe number $\nu = \frac{' + s1 + '}{' + s2 + '}$', fontsize=16)
+    s1 = "n({}) - n({})".format(wave1, wave2)
+    s2 = "n({}) - n({})".format(wave2, wave4)
+    print(s1, s2)
+    ax.set_ylabel(r'Partial dispersion $PD = \frac{' + s1 + '}{' + s2 + '}$', fontsize=16)
+
+    # Thanks to pelson (https://stackoverflow.com/users/741316/pelson) for providing the method at stackoverflow.com
+    # https://stackoverflow.com/questions/11537374/matplotlib-basemap-popup-box#new-answer
+    def on_move(event):
+        visibility_changed = False
+        for point, annotation in points_with_annotation:
+            should_be_visible = (point.contains(event)[0] == True)
+    
+            if should_be_visible != annotation.get_visible():
+                visibility_changed = True
+                annotation.set_visible(should_be_visible)
+    
+        if visibility_changed:
+            plt.draw()
+    
+    on_move_id = fig.canvas.mpl_connect('motion_notify_event', on_move)
+    # make an arbitrary legend for the glass status
+    dummy_lines = [matplotlib.lines.Line2D([0], [0], linestyle='none', marker='o', markerfacecolor=fc[item], label=item) for item in fc.keys()]
+    ax.legend(dummy_lines, fc.keys(), numpoints=1, loc='upper left', fontsize=14)
+    plt.tight_layout()
+    plt.show()
+    
+
+def plot_transmission_range(catalog, reference_waves=[]):
+    glassnames = cat.keys()
+    glassnames.sort()
+    glassnames = glassnames[223:-35]
+    min_wave = []
+    max_wave = []
+    for glassname in glassnames:
+        min_wave.append(cat[glassname]["min_lambda"])
+        max_wave.append(cat[glassname]["max_lambda"])
+    glassnames = np.array(glassnames)
+    min_wave = np.array(min_wave)
+    max_wave = np.array(max_wave)
+    
+    title = "Transmission Ranges"
+    index = np.arange(len(glassnames))
+    fig = plt.figure(figsize=(10, 0.4*(index[-1]+2)))
+    ax = plt.subplot(1, 1, 1)
+    ax.set_title(title, fontsize=14)
+    rects = ax.barh(index, max_wave, left=min_wave, align='center', alpha=0.4)
+    ax.set_xscale('linear')
+    ax.set_xlabel('Contribution to Total Scattered Energy [%]', fontsize=12)
+    ax.set_xlim((0.2, 1))
+    ax.set_yticklabels(glassnames, fontsize=12)
+    ax.set_yticks(index)
+    ax.set_ylim((index[0]-1, index[-1]+1))
+    plt.vlines(reference_waves, ax.get_ylim()[0], ax.get_ylim()[1], linestyles="dashed")
+    ax.grid()
+    plt.tight_layout()
+    plt.show()
+    
+
+def transmissive_glasses(catalog, min_wave, max_wave):
+    result = []
+    for glassname, data in catalog.items():
+        if data["min_lambda"] <= min_wave and data["max_lambda"] >= max_wave:
+            result.append(glassname)
+    result.sort()
+    return result
+    
+
+def filter_catalog(catalog, criterion, condition, value):
+    filtered_catalog = {}
+    if condition == "ge":
+        for glassname, data in catalog.items():
+            if data[criterion] >= value:
+                filtered_catalog[glassname] = data
+    elif condition == "le":
+         for glassname, data in catalog.items():
+            if data[criterion] <= value:
+                filtered_catalog[glassname] = data       
+    return filtered_catalog
+
+    
 if __name__ == "__main__":
     from os.path import expanduser
     
     home = expanduser("~")
     
-    wave1 = 0.8
+    wave1 = 0.750
     wave2 = 0.85
-    wave3 = 0.9
-    
+    wave3 = 0.920
+       
     filename = home + r"\Documents\Zemax\Glasscat\schott.agf"
-    print(filename)
     
     cat = read_agf_file(filename, encoding='ascii')
-    abbe_plot(cat, wave1, wave2, wave3)
+    # abbe_plot(cat, wave1, wave2, wave3)
+    plot_transmission_range(cat, reference_waves=[0.35, 0.45, 0.656])
+    for glass in transmissive_glasses(cat, 0.35, 0.98):
+        print(glass)
     
