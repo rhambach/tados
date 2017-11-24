@@ -52,7 +52,10 @@ def beam_size(position, waist, wavelength):
     
 def beam_radius(position, waist, wavelength):
     rayl = rayleigh(waist, wavelength)
-    return -position * (1 + (rayl / position)**2)    
+    return -position * (1 + (rayl / position)**2)
+
+def intensity_profile(x, w, n=2.0):
+    return np.exp(-2*(x/w)**n)
 
     
 if __name__ == "__main__":
@@ -66,7 +69,20 @@ if __name__ == "__main__":
         
         def test_fwhm2w(self):
             self.assertAlmostEqual(fwhm2w(2.0), 1.6986, places=4)
-    
-    
+            
+        def test_intensity_profile(self):
+            self.assertAlmostEqual(intensity_profile(0.0, 1.0), 1.0)
+            self.assertAlmostEqual(intensity_profile(23.5, 23.5), np.exp(-2))
+            self.assertAlmostEqual(intensity_profile(-23.5, 23.5), np.exp(-2))
+            self.assertAlmostEqual(intensity_profile(23.5, 23.5, n=4.0), np.exp(-2))
+            self.assertAlmostEqual(intensity_profile(-23.5, 23.5, n=4.0), np.exp(-2))
+            self.assertAlmostEqual(intensity_profile(0.5 * w2fwhm(23.5), 23.5), 0.5)
+            self.assertAlmostEqual(intensity_profile(-0.5 * w2fwhm(23.5), 23.5), 0.5)
+            self.assertAlmostEqual(intensity_profile(0.5 * w2fwhm(23.5, n=4.0), 23.5, n=4.0), 0.5)
+            self.assertAlmostEqual(intensity_profile(-0.5 * w2fwhm(23.5, n=4.0), 23.5, n=4.0), 0.5)
+            self.assertTupleEqual(tuple(np.round(intensity_profile(np.array([0.0, 0.5 * w2fwhm(23.5, n=4.0), 23.5]), 23.5, n=4.0), decimals=10)), (1.0, 0.5, np.round(np.exp(-2), decimals=10)))
+            self.assertTupleEqual(tuple(np.round(intensity_profile(np.array([0.0, -0.5 * w2fwhm(23.5, n=4.0), -23.5]), 23.5, n=4.0), decimals=10)), (1.0, 0.5, np.round(np.exp(-2), decimals=10)))
+
+            
     unittest.main()
     
